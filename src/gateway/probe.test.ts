@@ -115,6 +115,19 @@ describe("probeGateway", () => {
     expect(gatewayClientState.requests).toEqual([]);
   });
 
+  it("keeps device identity enabled for authenticated lightweight probes", async () => {
+    const result = await probeGateway({
+      url: "ws://127.0.0.1:18789",
+      auth: { token: "secret" },
+      timeoutMs: 1_000,
+      includeDetails: false,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(gatewayClientState.options?.deviceIdentity).toEqual(deviceIdentityState.value);
+    expect(gatewayClientState.requests).toEqual([]);
+  });
+
   it("falls back to token/password auth when device identity cannot be persisted", async () => {
     deviceIdentityState.throwOnLoad = true;
 

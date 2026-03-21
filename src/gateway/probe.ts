@@ -53,9 +53,6 @@ export async function probeGateway(opts: {
   const detailLevel = opts.includeDetails === false ? "none" : (opts.detailLevel ?? "full");
 
   const deviceIdentity = (() => {
-    if (detailLevel === "none") {
-      return null;
-    }
     let hostname: string;
     try {
       hostname = new URL(opts.url).hostname;
