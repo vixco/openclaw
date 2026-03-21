@@ -79,13 +79,10 @@ async function emitPngMediaToolResult(
   });
 }
 
-async function emitUntrustedToolMediaResult(
-  ctx: EmbeddedPiSubscribeContext,
-  mediaPathOrUrl: string,
-) {
+async function emitToolMediaResult(ctx: EmbeddedPiSubscribeContext, mediaPathOrUrl: string) {
   await handleToolExecutionEnd(ctx, {
     type: "tool_execution_end",
-    toolName: "plugin_tool",
+    toolName: "browser",
     toolCallId: "tc-1",
     isError: false,
     result: {
@@ -94,7 +91,7 @@ async function emitUntrustedToolMediaResult(
   });
 }
 
-describe("handleToolExecutionEnd media emission", () => {
+describe("handleToolExecutionEnd tool media", () => {
   it("does not warn for read tool when path is provided via file_path alias", async () => {
     const ctx = createMockContext();
 
@@ -108,35 +105,31 @@ describe("handleToolExecutionEnd media emission", () => {
     expect(ctx.log.warn).not.toHaveBeenCalled();
   });
 
-  it("emits media when verbose is off and tool result has MEDIA: path", async () => {
+  it("does not emit raw media when verbose is off and tool result has MEDIA: path", async () => {
     const onToolResult = vi.fn();
     const ctx = createMockContext({ shouldEmitToolOutput: false, onToolResult });
 
     await emitPngMediaToolResult(ctx);
 
-    expect(onToolResult).toHaveBeenCalledWith({
-      mediaUrls: ["/tmp/screenshot.png"],
-    });
+    expect(onToolResult).not.toHaveBeenCalled();
   });
 
-  it("does NOT emit local media for untrusted tools", async () => {
+  it("does not emit raw local media from tool output text", async () => {
     const onToolResult = vi.fn();
     const ctx = createMockContext({ shouldEmitToolOutput: false, onToolResult });
 
-    await emitUntrustedToolMediaResult(ctx, "/tmp/secret.png");
+    await emitToolMediaResult(ctx, "/tmp/secret.png");
 
     expect(onToolResult).not.toHaveBeenCalled();
   });
 
-  it("emits remote media for untrusted tools", async () => {
+  it("does not emit raw remote media from tool output text", async () => {
     const onToolResult = vi.fn();
     const ctx = createMockContext({ shouldEmitToolOutput: false, onToolResult });
 
-    await emitUntrustedToolMediaResult(ctx, "https://example.com/file.png");
+    await emitToolMediaResult(ctx, "https://example.com/file.png");
 
-    expect(onToolResult).toHaveBeenCalledWith({
-      mediaUrls: ["https://example.com/file.png"],
-    });
+    expect(onToolResult).not.toHaveBeenCalled();
   });
 
   it("does NOT emit media when verbose is full (emitToolOutput handles it)", async () => {
@@ -230,7 +223,7 @@ describe("handleToolExecutionEnd media emission", () => {
     expect(onToolResult).not.toHaveBeenCalled();
   });
 
-  it("emits media from details.path fallback when no MEDIA: text", async () => {
+  it("does not emit media from details.path fallback when no MEDIA: text", async () => {
     const onToolResult = vi.fn();
     const ctx = createMockContext({ shouldEmitToolOutput: false, onToolResult });
 
@@ -248,8 +241,6 @@ describe("handleToolExecutionEnd media emission", () => {
       },
     });
 
-    expect(onToolResult).toHaveBeenCalledWith({
-      mediaUrls: ["/tmp/canvas-output.png"],
-    });
+    expect(onToolResult).not.toHaveBeenCalled();
   });
 });

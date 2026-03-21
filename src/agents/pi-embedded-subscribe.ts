@@ -1,5 +1,4 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import { parseReplyDirectives } from "../auto-reply/reply/reply-directives.js";
 import { createStreamingDirectiveAccumulator } from "../auto-reply/reply/streaming-directives.js";
 import { formatToolAggregate } from "../auto-reply/tool-meta.js";
 import { emitAgentEvent } from "../infra/agent-events.js";
@@ -16,7 +15,6 @@ import type {
   EmbeddedPiSubscribeContext,
   EmbeddedPiSubscribeState,
 } from "./pi-embedded-subscribe.handlers.types.js";
-import { filterToolResultMediaUrls } from "./pi-embedded-subscribe.tools.js";
 import type { SubscribeEmbeddedPiSessionParams } from "./pi-embedded-subscribe.types.js";
 import { formatReasoningMessage, stripDowngradedToolCallText } from "./pi-embedded-utils.js";
 import { hasNonzeroUsage, normalizeUsage, type UsageLike } from "./usage.js";
@@ -330,19 +328,17 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     }
     return `\`\`\`txt\n${trimmed}\n\`\`\``;
   };
-  const emitToolResultMessage = (toolName: string | undefined, message: string) => {
+  const emitToolResultMessage = (message: string) => {
     if (!params.onToolResult) {
       return;
     }
-    const { text: cleanedText, mediaUrls } = parseReplyDirectives(message);
-    const filteredMediaUrls = filterToolResultMediaUrls(toolName, mediaUrls ?? []);
-    if (!cleanedText && filteredMediaUrls.length === 0) {
+    const cleanedText = message.trim();
+    if (!cleanedText) {
       return;
     }
     try {
       void params.onToolResult({
         text: cleanedText,
-        mediaUrls: filteredMediaUrls.length ? filteredMediaUrls : undefined,
       });
     } catch {
       // ignore tool result delivery failures
@@ -352,7 +348,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     const agg = formatToolAggregate(toolName, meta ? [meta] : undefined, {
       markdown: useMarkdown,
     });
-    emitToolResultMessage(toolName, agg);
+    emitToolResultMessage(agg);
   };
   const emitToolOutput = (toolName?: string, meta?: string, output?: string) => {
     if (!output) {
@@ -362,7 +358,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
       markdown: useMarkdown,
     });
     const message = `${agg}\n${formatToolOutputBlock(output)}`;
-    emitToolResultMessage(toolName, message);
+    emitToolResultMessage(message);
   };
 
   const stripBlockTags = (
