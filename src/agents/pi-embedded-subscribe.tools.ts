@@ -1,10 +1,21 @@
-import type { ReplyPayload } from "../auto-reply/types.js";
 import { getChannelPlugin, normalizeChannelId } from "../channels/plugins/index.js";
 import { normalizeTargetForProvider } from "../infra/outbound/target-normalization.js";
 import { truncateUtf16Safe } from "../utils.js";
 import { collectTextContentBlocks } from "./content-blocks.js";
 import { type MessagingToolSend } from "./pi-embedded-messaging.js";
 import { normalizeToolName } from "./tool-policy.js";
+
+/**
+ * Media artifact declared by a tool in `details.media`.
+ * Describes what the tool produced (files, audio) — not how to deliver it.
+ * The consumer (block reply pipeline) decides delivery.
+ */
+export type ToolMediaArtifact = {
+  mediaUrl?: string;
+  mediaUrls?: string[];
+  /** When true, audio should be sent as a voice bubble, not a file attachment. */
+  audioAsVoice?: boolean;
+};
 
 const TOOL_RESULT_MAX_CHARS = 8000;
 const TOOL_ERROR_MAX_CHARS = 400;
@@ -159,95 +170,74 @@ export function extractToolResultText(result: unknown): string | undefined {
   return texts.join("\n");
 }
 
-function normalizeToolResultReplyPayload(value: unknown): ReplyPayload | undefined {
+/**
+ * Parse an unknown value into a ToolMediaArtifact.
+ * An optional `urlFilter` predicate controls which URLs are kept;
+ * when omitted all URLs pass through.
+ */
+function normalizeMediaArtifact(
+  value: unknown,
+  urlFilter?: (url: string) => boolean,
+): ToolMediaArtifact | undefined {
   if (!value || typeof value !== "object") {
     return undefined;
   }
   const record = value as Record<string, unknown>;
-  const text = typeof record.text === "string" ? record.text : undefined;
-  const mediaUrl = typeof record.mediaUrl === "string" ? record.mediaUrl : undefined;
+  const isValidUrl = (entry: unknown): entry is string =>
+    typeof entry === "string" && entry.trim().length > 0;
+  const isAllowed = (url: string) => !urlFilter || urlFilter(url);
+
+  const mediaUrl =
+    typeof record.mediaUrl === "string" && isAllowed(record.mediaUrl) ? record.mediaUrl : undefined;
   const mediaUrls = Array.isArray(record.mediaUrls)
-    ? record.mediaUrls.filter(
-        (entry): entry is string => typeof entry === "string" && entry.trim().length > 0,
-      )
+    ? record.mediaUrls.filter((entry): entry is string => isValidUrl(entry) && isAllowed(entry))
     : undefined;
   const audioAsVoice = record.audioAsVoice === true;
-  const channelData =
-    record.channelData &&
-    typeof record.channelData === "object" &&
-    !Array.isArray(record.channelData)
-      ? (record.channelData as Record<string, unknown>)
-      : undefined;
-  if (!text && !mediaUrl && !mediaUrls?.length && !audioAsVoice && !channelData) {
+  if (!mediaUrl && !mediaUrls?.length && !audioAsVoice) {
     return undefined;
   }
   return {
-    ...(text !== undefined ? { text } : {}),
     ...(mediaUrl ? { mediaUrl } : {}),
     ...(mediaUrls?.length ? { mediaUrls } : {}),
     ...(audioAsVoice ? { audioAsVoice } : {}),
-    ...(channelData ? { channelData } : {}),
   };
 }
 
-function isToolResultMediaTrusted(toolName: string): boolean {
-  return TRUSTED_TOOL_RESULT_MEDIA.has(normalizeToolName(toolName));
-}
-
-function filterToolResultReplyPayloadMedia(toolName: string, payload: ReplyPayload): ReplyPayload {
-  const allowLocalPaths = isToolResultMediaTrusted(toolName);
-  const mediaUrl =
-    typeof payload.mediaUrl === "string" &&
-    (allowLocalPaths || HTTP_URL_RE.test(payload.mediaUrl.trim()))
-      ? payload.mediaUrl
-      : undefined;
-  const mediaUrls = payload.mediaUrls?.filter(
-    (url) => allowLocalPaths || HTTP_URL_RE.test(url.trim()),
-  );
-  if (
-    mediaUrl === payload.mediaUrl &&
-    mediaUrls?.length === payload.mediaUrls?.length &&
-    (payload.text || mediaUrl || mediaUrls?.length || payload.audioAsVoice || payload.channelData)
-  ) {
-    return payload;
-  }
-  return {
-    ...payload,
-    mediaUrl,
-    mediaUrls: mediaUrls?.length ? mediaUrls : undefined,
-  };
-}
-
-export function extractToolResultReplyPayload(
+/**
+ * Extract media artifacts from a tool result's `details.media` field.
+ * Returns undefined when the tool did not produce any deliverable media.
+ * Untrusted tools have local file paths filtered out (only HTTP URLs pass).
+ */
+export function extractToolMediaArtifact(
   toolName: string,
   result: unknown,
-): ReplyPayload | undefined {
+): ToolMediaArtifact | undefined {
   if (!result || typeof result !== "object") {
     return undefined;
   }
   const record = result as Record<string, unknown>;
-  const payload =
-    normalizeToolResultReplyPayload(record.reply) ??
-    normalizeToolResultReplyPayload(
-      record.details && typeof record.details === "object"
-        ? (record.details as Record<string, unknown>).reply
-        : undefined,
-    );
-  if (!payload) {
-    return undefined;
-  }
-  const filtered = filterToolResultReplyPayloadMedia(toolName, payload);
-  return resolveSendableToolReplyPayload(filtered) ? filtered : undefined;
+  const details =
+    record.details && typeof record.details === "object" && !Array.isArray(record.details)
+      ? (record.details as Record<string, unknown>)
+      : undefined;
+  const allowLocalPaths = TRUSTED_TOOL_RESULT_MEDIA.has(normalizeToolName(toolName));
+  const urlFilter = allowLocalPaths ? undefined : (url: string) => HTTP_URL_RE.test(url.trim());
+  return (
+    normalizeMediaArtifact(record.media, urlFilter) ??
+    normalizeMediaArtifact(details?.media, urlFilter)
+  );
 }
 
-function resolveSendableToolReplyPayload(payload: ReplyPayload): boolean {
-  return Boolean(
-    payload.text ||
-    payload.mediaUrl ||
-    payload.mediaUrls?.length ||
-    payload.audioAsVoice ||
-    payload.channelData,
-  );
+/** Resolve all media URLs from a ToolMediaArtifact into a flat list. */
+export function resolveMediaArtifactUrls(artifact: ToolMediaArtifact): string[] {
+  const urls: string[] = [];
+  if (artifact.mediaUrl) {
+    urls.push(artifact.mediaUrl);
+  }
+  if (artifact.mediaUrls?.length) {
+    urls.push(...artifact.mediaUrls);
+  }
+  return urls;
 }
 
 export function isToolResultError(result: unknown): boolean {

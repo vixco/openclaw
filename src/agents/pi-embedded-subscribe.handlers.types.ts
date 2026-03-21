@@ -5,6 +5,7 @@ import type { InlineCodeState } from "../markdown/code-spans.js";
 import type { HookRunner } from "../plugins/hooks.js";
 import type { EmbeddedBlockChunker } from "./pi-embedded-block-chunker.js";
 import type { MessagingToolSend } from "./pi-embedded-messaging.js";
+import type { ToolMediaArtifact } from "./pi-embedded-subscribe.tools.js";
 import type {
   BlockReplyChunking,
   SubscribeEmbeddedPiSessionParams,
@@ -78,6 +79,8 @@ export type EmbeddedPiSubscribeState = {
   pendingMessagingMediaUrls: Map<string, string[]>;
   deterministicApprovalPromptSent: boolean;
   lastAssistant?: AgentMessage;
+  /** Media artifacts collected from tool results, to be attached to the next block reply. */
+  pendingMediaArtifacts: Array<{ toolName: string; artifact: ToolMediaArtifact }>;
 };
 
 export type EmbeddedPiSubscribeContext = {
@@ -98,7 +101,7 @@ export type EmbeddedPiSubscribeContext = {
     state: { thinking: boolean; final: boolean; inlineCode?: InlineCodeState },
   ) => string;
   emitBlockChunk: (text: string) => void;
-  flushBlockReplyBuffer: () => void;
+  flushBlockReplyBuffer: (opts?: { drainOrphanedArtifacts?: boolean }) => void;
   emitReasoningStream: (text: string) => void;
   consumeReplyDirectives: (
     text: string,
@@ -115,6 +118,11 @@ export type EmbeddedPiSubscribeContext = {
     addedDuringMessage: boolean;
     chunkerHasBuffered: boolean;
   }) => void;
+  drainPendingMediaArtifacts: () => {
+    mediaUrls: string[];
+    voiceMediaUrls: string[];
+    audioAsVoice: boolean;
+  };
   trimMessagingToolSent: () => void;
   ensureCompactionPromise: () => void;
   noteCompactionRetry: () => void;
@@ -157,6 +165,7 @@ export type ToolHandlerState = Pick<
   | "messagingToolSentTargets"
   | "successfulCronAdds"
   | "deterministicApprovalPromptSent"
+  | "pendingMediaArtifacts"
 >;
 
 export type ToolHandlerContext = {
@@ -164,7 +173,7 @@ export type ToolHandlerContext = {
   state: ToolHandlerState;
   log: EmbeddedSubscribeLogger;
   hookRunner?: HookRunner;
-  flushBlockReplyBuffer: () => void;
+  flushBlockReplyBuffer: (opts?: { drainOrphanedArtifacts?: boolean }) => void;
   shouldEmitToolResult: () => boolean;
   shouldEmitToolOutput: () => boolean;
   emitToolSummary: (toolName?: string, meta?: string) => void;

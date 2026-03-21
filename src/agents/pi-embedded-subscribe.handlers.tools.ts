@@ -15,7 +15,7 @@ import type {
 import {
   extractMessagingToolSend,
   extractToolErrorMessage,
-  extractToolResultReplyPayload,
+  extractToolMediaArtifact,
   extractToolResultText,
   isToolResultError,
   sanitizeToolResult,
@@ -32,6 +32,7 @@ type ToolStartRecord = {
 
 /** Track tool execution start data for after_tool_call hook. */
 const toolStartData = new Map<string, ToolStartRecord>();
+const MAX_PENDING_MEDIA_ARTIFACTS = 200;
 
 function buildToolStartKey(runId: string, toolCallId: string): string {
   return `${runId}:${toolCallId}`;
@@ -225,6 +226,22 @@ async function emitToolResultOutput(params: {
   sanitizedResult: unknown;
 }) {
   const { ctx, toolName, meta, isToolError, result, sanitizedResult } = params;
+
+  // Stash media artifacts for the block reply pipeline regardless of whether
+  // onToolResult is wired — artifacts are consumed by block replies, not onToolResult.
+  if (!isToolError) {
+    const artifact = extractToolMediaArtifact(toolName, result);
+    if (artifact) {
+      ctx.state.pendingMediaArtifacts.push({ toolName, artifact });
+      if (ctx.state.pendingMediaArtifacts.length > MAX_PENDING_MEDIA_ARTIFACTS) {
+        ctx.state.pendingMediaArtifacts.splice(
+          0,
+          ctx.state.pendingMediaArtifacts.length - MAX_PENDING_MEDIA_ARTIFACTS,
+        );
+      }
+    }
+  }
+
   if (!ctx.params.onToolResult) {
     return;
   }
@@ -269,32 +286,11 @@ async function emitToolResultOutput(params: {
     return;
   }
 
-  const explicitReplyPayload = !isToolError
-    ? extractToolResultReplyPayload(toolName, result)
-    : undefined;
-
   if (ctx.shouldEmitToolOutput()) {
     const outputText = extractToolResultText(sanitizedResult);
     if (outputText) {
       ctx.emitToolOutput(toolName, meta, outputText);
     }
-    if (!explicitReplyPayload) {
-      return;
-    }
-  }
-
-  if (isToolError) {
-    return;
-  }
-
-  if (!explicitReplyPayload) {
-    return;
-  }
-
-  try {
-    await ctx.params.onToolResult?.(explicitReplyPayload);
-  } catch {
-    // ignore delivery failures
   }
 }
 

@@ -4,6 +4,10 @@ Docs: https://docs.openclaw.ai
 
 ## Unreleased
 
+### Breaking Changes
+
+- Agents/tools: replace tool media delivery payloads to use `details.media` (instead of `details.reply`) for media artifacts; plugins should emit `details.media` for attachments. (#51731) Thanks @christianklotz.
+
 ### Changes
 
 - Models/Anthropic Vertex: add core `anthropic-vertex` provider support for Claude via Google Vertex AI, including GCP auth/discovery and main run-path routing. (#43356) Thanks @sallyom and @yossiovadia.

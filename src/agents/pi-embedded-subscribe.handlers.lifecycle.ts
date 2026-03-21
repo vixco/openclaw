@@ -96,7 +96,7 @@ export function handleAgentEnd(ctx: EmbeddedPiSubscribeContext) {
     });
   }
 
-  ctx.flushBlockReplyBuffer();
+  ctx.flushBlockReplyBuffer({ drainOrphanedArtifacts: true });
   // Flush the reply pipeline so the response reaches the channel before
   // compaction wait blocks the run.  This mirrors the pattern used by
   // handleToolExecutionStart and ensures delivery is not held hostage to

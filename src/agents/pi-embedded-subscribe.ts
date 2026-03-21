@@ -15,6 +15,7 @@ import type {
   EmbeddedPiSubscribeContext,
   EmbeddedPiSubscribeState,
 } from "./pi-embedded-subscribe.handlers.types.js";
+import { resolveMediaArtifactUrls } from "./pi-embedded-subscribe.tools.js";
 import type { SubscribeEmbeddedPiSessionParams } from "./pi-embedded-subscribe.types.js";
 import { formatReasoningMessage, stripDowngradedToolCallText } from "./pi-embedded-utils.js";
 import { hasNonzeroUsage, normalizeUsage, type UsageLike } from "./usage.js";
@@ -77,6 +78,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     successfulCronAdds: 0,
     pendingMessagingMediaUrls: new Map(),
     deterministicApprovalPromptSent: false,
+    pendingMediaArtifacts: [],
   };
   const usageTotals = {
     input: 0,
@@ -471,6 +473,28 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     return output;
   };
 
+  /** Drain all pending media artifacts and clear the buffer. */
+  const drainPendingMediaArtifacts = (): {
+    mediaUrls: string[];
+    voiceMediaUrls: string[];
+    audioAsVoice: boolean;
+  } => {
+    const mediaUrls: string[] = [];
+    const voiceMediaUrls: string[] = [];
+    let audioAsVoice = false;
+    for (const { artifact } of state.pendingMediaArtifacts) {
+      const urls = resolveMediaArtifactUrls(artifact);
+      if (artifact.audioAsVoice) {
+        voiceMediaUrls.push(...urls);
+        audioAsVoice = true;
+      } else {
+        mediaUrls.push(...urls);
+      }
+    }
+    state.pendingMediaArtifacts.length = 0;
+    return { mediaUrls, voiceMediaUrls, audioAsVoice };
+  };
+
   const emitBlockChunk = (text: string) => {
     if (state.suppressBlockChunks) {
       return;
@@ -515,18 +539,45 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
       replyToTag,
       replyToCurrent,
     } = splitResult;
+
+    // Drain pending media artifacts from tool results and attach to this block reply.
+    const drained = drainPendingMediaArtifacts();
+    const mergedMediaUrls = [...(mediaUrls ?? []), ...drained.mediaUrls];
+    const audioAsVoiceFromDirectives = audioAsVoice;
+    const voiceMediaUrls = drained.voiceMediaUrls;
+
     // Skip empty payloads, but always emit if audioAsVoice is set (to propagate the flag)
-    if (!cleanedText && (!mediaUrls || mediaUrls.length === 0) && !audioAsVoice) {
+    if (
+      !cleanedText &&
+      mergedMediaUrls.length === 0 &&
+      voiceMediaUrls.length === 0 &&
+      !audioAsVoiceFromDirectives &&
+      !drained.audioAsVoice
+    ) {
       return;
     }
-    emitBlockReplySafely({
-      text: cleanedText,
-      mediaUrls: mediaUrls?.length ? mediaUrls : undefined,
-      audioAsVoice,
-      replyToId,
-      replyToTag,
-      replyToCurrent,
-    });
+    const shouldEmitStandard =
+      Boolean(cleanedText) || mergedMediaUrls.length > 0 || audioAsVoiceFromDirectives;
+    if (shouldEmitStandard) {
+      emitBlockReplySafely({
+        text: cleanedText,
+        mediaUrls: mergedMediaUrls.length > 0 ? mergedMediaUrls : undefined,
+        audioAsVoice: audioAsVoiceFromDirectives,
+        replyToId,
+        replyToTag,
+        replyToCurrent,
+      });
+    }
+    if (voiceMediaUrls.length > 0 || drained.audioAsVoice) {
+      emitBlockReplySafely({
+        text: shouldEmitStandard ? undefined : cleanedText,
+        mediaUrls: voiceMediaUrls.length > 0 ? voiceMediaUrls : undefined,
+        audioAsVoice: true,
+        replyToId,
+        replyToTag,
+        replyToCurrent,
+      });
+    }
   };
 
   const consumeReplyDirectives = (text: string, options?: { final?: boolean }) =>
@@ -534,18 +585,37 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
   const consumePartialReplyDirectives = (text: string, options?: { final?: boolean }) =>
     partialReplyDirectiveAccumulator.consume(text, options);
 
-  const flushBlockReplyBuffer = () => {
+  const flushBlockReplyBuffer = (opts?: { drainOrphanedArtifacts?: boolean }) => {
     if (!params.onBlockReply) {
       return;
     }
     if (blockChunker?.hasBuffered()) {
       blockChunker.drain({ force: true, emit: emitBlockChunk });
       blockChunker.reset();
-      return;
-    }
-    if (state.blockBuffer.length > 0) {
+    } else if (state.blockBuffer.length > 0) {
       emitBlockChunk(state.blockBuffer);
       state.blockBuffer = "";
+    }
+
+    // Only drain orphaned artifacts at terminal points (agent end), not before
+    // tool executions or message resets where later text may still attach them.
+    if (opts?.drainOrphanedArtifacts && state.pendingMediaArtifacts.length > 0) {
+      const {
+        mediaUrls: artifactMediaUrls,
+        voiceMediaUrls: artifactVoiceMediaUrls,
+        audioAsVoice: artifactAudioAsVoice,
+      } = drainPendingMediaArtifacts();
+      if (artifactMediaUrls.length > 0) {
+        emitBlockReplySafely({
+          mediaUrls: artifactMediaUrls,
+        });
+      }
+      if (artifactVoiceMediaUrls.length > 0 || artifactAudioAsVoice) {
+        emitBlockReplySafely({
+          mediaUrls: artifactVoiceMediaUrls.length > 0 ? artifactVoiceMediaUrls : undefined,
+          audioAsVoice: true,
+        });
+      }
     }
   };
 
@@ -596,6 +666,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     state.successfulCronAdds = 0;
     state.pendingMessagingMediaUrls.clear();
     state.deterministicApprovalPromptSent = false;
+    state.pendingMediaArtifacts.length = 0;
     resetAssistantMessageState(0);
   };
 
@@ -626,6 +697,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     resetAssistantMessageState,
     resetForCompactionRetry,
     finalizeAssistantTexts,
+    drainPendingMediaArtifacts,
     trimMessagingToolSent,
     ensureCompactionPromise,
     noteCompactionRetry,
