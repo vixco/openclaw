@@ -79,6 +79,23 @@ async function emitPngMediaToolResult(
   });
 }
 
+async function emitExplicitToolReply(ctx: EmbeddedPiSubscribeContext) {
+  await handleToolExecutionEnd(ctx, {
+    type: "tool_execution_end",
+    toolName: "image_generate",
+    toolCallId: "tc-explicit",
+    isError: false,
+    result: {
+      content: [{ type: "text", text: "Generated 1 image." }],
+      details: {
+        reply: {
+          mediaUrls: ["/tmp/generated.png"],
+        },
+      },
+    },
+  });
+}
+
 async function emitToolMediaResult(ctx: EmbeddedPiSubscribeContext, mediaPathOrUrl: string) {
   await handleToolExecutionEnd(ctx, {
     type: "tool_execution_end",
@@ -112,6 +129,17 @@ describe("handleToolExecutionEnd tool media", () => {
     await emitPngMediaToolResult(ctx);
 
     expect(onToolResult).not.toHaveBeenCalled();
+  });
+
+  it("emits explicit tool reply payloads when verbose is off", async () => {
+    const onToolResult = vi.fn();
+    const ctx = createMockContext({ shouldEmitToolOutput: false, onToolResult });
+
+    await emitExplicitToolReply(ctx);
+
+    expect(onToolResult).toHaveBeenCalledWith({
+      mediaUrls: ["/tmp/generated.png"],
+    });
   });
 
   it("does not emit raw local media from tool output text", async () => {
@@ -151,6 +179,18 @@ describe("handleToolExecutionEnd tool media", () => {
         !("text" in (call[0] as Record<string, unknown>)),
     );
     expect(directMediaCalls).toHaveLength(0);
+  });
+
+  it("still emits explicit tool reply payloads when verbose is full", async () => {
+    const onToolResult = vi.fn();
+    const ctx = createMockContext({ shouldEmitToolOutput: true, onToolResult });
+
+    await emitExplicitToolReply(ctx);
+
+    expect(ctx.emitToolOutput).toHaveBeenCalled();
+    expect(onToolResult).toHaveBeenCalledWith({
+      mediaUrls: ["/tmp/generated.png"],
+    });
   });
 
   it("does NOT emit media for error results", async () => {

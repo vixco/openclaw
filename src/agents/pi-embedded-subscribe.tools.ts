@@ -1,3 +1,4 @@
+import type { ReplyPayload } from "../auto-reply/types.js";
 import { getChannelPlugin, normalizeChannelId } from "../channels/plugins/index.js";
 import { normalizeTargetForProvider } from "../infra/outbound/target-normalization.js";
 import { truncateUtf16Safe } from "../utils.js";
@@ -126,6 +127,52 @@ export function extractToolResultText(result: unknown): string | undefined {
     return undefined;
   }
   return texts.join("\n");
+}
+
+function normalizeToolResultReplyPayload(value: unknown): ReplyPayload | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const record = value as Record<string, unknown>;
+  const text = typeof record.text === "string" ? record.text : undefined;
+  const mediaUrl = typeof record.mediaUrl === "string" ? record.mediaUrl : undefined;
+  const mediaUrls = Array.isArray(record.mediaUrls)
+    ? record.mediaUrls.filter(
+        (entry): entry is string => typeof entry === "string" && entry.trim().length > 0,
+      )
+    : undefined;
+  const audioAsVoice = record.audioAsVoice === true;
+  const channelData =
+    record.channelData &&
+    typeof record.channelData === "object" &&
+    !Array.isArray(record.channelData)
+      ? (record.channelData as Record<string, unknown>)
+      : undefined;
+  if (!text && !mediaUrl && !mediaUrls?.length && !audioAsVoice && !channelData) {
+    return undefined;
+  }
+  return {
+    ...(text !== undefined ? { text } : {}),
+    ...(mediaUrl ? { mediaUrl } : {}),
+    ...(mediaUrls?.length ? { mediaUrls } : {}),
+    ...(audioAsVoice ? { audioAsVoice } : {}),
+    ...(channelData ? { channelData } : {}),
+  };
+}
+
+export function extractToolResultReplyPayload(result: unknown): ReplyPayload | undefined {
+  if (!result || typeof result !== "object") {
+    return undefined;
+  }
+  const record = result as Record<string, unknown>;
+  return (
+    normalizeToolResultReplyPayload(record.reply) ??
+    normalizeToolResultReplyPayload(
+      record.details && typeof record.details === "object"
+        ? (record.details as Record<string, unknown>).reply
+        : undefined,
+    )
+  );
 }
 
 export function isToolResultError(result: unknown): boolean {

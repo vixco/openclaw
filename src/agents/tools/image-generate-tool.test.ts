@@ -212,6 +212,9 @@ describe("createImageGenerateTool", () => {
         },
       ],
       details: {
+        reply: {
+          mediaUrls: ["/tmp/generated-1.png", "/tmp/generated-2.png"],
+        },
         provider: "openai",
         model: "gpt-image-1",
         count: 2,
@@ -221,8 +224,7 @@ describe("createImageGenerateTool", () => {
       },
     });
     const text = (result.content?.[0] as { text: string } | undefined)?.text ?? "";
-    expect(text).toContain("MEDIA:/tmp/generated-1.png");
-    expect(text).toContain("MEDIA:/tmp/generated-2.png");
+    expect(text).not.toContain("MEDIA:");
   });
 
   it("rejects counts outside the supported range", async () => {

@@ -498,7 +498,7 @@ export function createImageGenerateTool(options?: {
     label: "Image Generation",
     name: "image_generate",
     description:
-      'Generate new images or edit reference images with the configured or inferred image-generation model. Use action="list" to inspect available providers/models. Generated images are delivered automatically from the tool result as MEDIA paths.',
+      'Generate new images or edit reference images with the configured or inferred image-generation model. Use action="list" to inspect available providers/models. Generated images are delivered automatically from the tool result reply payload.',
     parameters: ImageGenerateToolSchema,
     execute: async (_toolCallId, args) => {
       const params = args as Record<string, unknown>;
@@ -610,12 +610,14 @@ export function createImageGenerateTool(options?: {
         .filter((entry): entry is string => Boolean(entry));
       const lines = [
         `Generated ${savedImages.length} image${savedImages.length === 1 ? "" : "s"} with ${result.provider}/${result.model}.`,
-        ...savedImages.map((image) => `MEDIA:${image.path}`),
       ];
 
       return {
         content: [{ type: "text", text: lines.join("\n") }],
         details: {
+          reply: {
+            mediaUrls: savedImages.map((image) => image.path),
+          },
           provider: result.provider,
           model: result.model,
           count: savedImages.length,

@@ -5,6 +5,7 @@ vi.mock("../../auto-reply/tokens.js", () => ({
 }));
 
 const { createTtsTool } = await import("./tts-tool.js");
+const ttsModule = await import("../../tts/tts.js");
 
 describe("createTtsTool", () => {
   it("uses SILENT_REPLY_TOKEN in guidance text", () => {
@@ -12,5 +13,29 @@ describe("createTtsTool", () => {
 
     expect(tool.description).toContain("QUIET_TOKEN");
     expect(tool.description).not.toContain("NO_REPLY");
+  });
+
+  it("returns an explicit reply payload for generated audio", async () => {
+    vi.spyOn(ttsModule, "textToSpeech").mockResolvedValue({
+      success: true,
+      audioPath: "/tmp/voice.opus",
+      provider: "openai",
+      voiceCompatible: true,
+    });
+
+    const tool = createTtsTool();
+    const result = await tool.execute("call-1", { text: "hello" });
+
+    expect(result).toMatchObject({
+      content: [{ type: "text", text: "Generated speech audio." }],
+      details: {
+        audioPath: "/tmp/voice.opus",
+        provider: "openai",
+        reply: {
+          mediaUrl: "/tmp/voice.opus",
+          audioAsVoice: true,
+        },
+      },
+    });
   });
 });
