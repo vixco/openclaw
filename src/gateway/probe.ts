@@ -50,17 +50,24 @@ export async function probeGateway(opts: {
   let connectError: string | null = null;
   let close: GatewayProbeClose | null = null;
 
+  const detailLevel = opts.includeDetails === false ? "none" : (opts.detailLevel ?? "full");
+
   const deviceIdentity = (() => {
-    if (opts.includeDetails === false) {
+    if (detailLevel === "none") {
+      return null;
+    }
+    let hostname: string;
+    try {
+      hostname = new URL(opts.url).hostname;
+    } catch {
+      return null;
+    }
+    // Local authenticated probes should stay device-bound so read/detail RPCs
+    // are not scope-limited by the shared-auth scope stripping hardening.
+    if (isLoopbackHost(hostname) && !(opts.auth?.token || opts.auth?.password)) {
       return null;
     }
     try {
-      const hostname = new URL(opts.url).hostname;
-      // Local authenticated probes should stay device-bound so read/detail RPCs
-      // are not scope-limited by the shared-auth scope stripping hardening.
-      if (isLoopbackHost(hostname) && !(opts.auth?.token || opts.auth?.password)) {
-        return null;
-      }
       return loadOrCreateDeviceIdentity();
     } catch {
       // Read-only or restricted environments should still be able to run
@@ -68,8 +75,6 @@ export async function probeGateway(opts: {
       return null;
     }
   })();
-
-  const detailLevel = opts.includeDetails === false ? "none" : (opts.detailLevel ?? "full");
 
   return await new Promise<GatewayProbeResult>((resolve) => {
     let settled = false;
