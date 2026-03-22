@@ -43,6 +43,7 @@ export async function probeGateway(opts: {
   timeoutMs: number;
   includeDetails?: boolean;
   detailLevel?: "none" | "presence" | "full";
+  tlsFingerprint?: string;
 }): Promise<GatewayProbeResult> {
   const startedAt = Date.now();
   const instanceId = randomUUID();
@@ -100,6 +101,7 @@ export async function probeGateway(opts: {
       url: opts.url,
       token: opts.auth?.token,
       password: opts.auth?.password,
+      tlsFingerprint: opts.tlsFingerprint,
       scopes: [READ_SCOPE],
       clientName: GATEWAY_CLIENT_NAMES.CLI,
       clientVersion: "dev",
