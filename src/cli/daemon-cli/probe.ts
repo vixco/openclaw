@@ -1,3 +1,4 @@
+import { callGateway } from "../../gateway/call.js";
 import { probeGateway } from "../../gateway/probe.js";
 import { withProgress } from "../progress.js";
 
@@ -8,6 +9,8 @@ export async function probeGatewayStatus(opts: {
   tlsFingerprint?: string;
   timeoutMs: number;
   json?: boolean;
+  requireRpc?: boolean;
+  configPath?: string;
 }) {
   try {
     const result = await withProgress(
@@ -16,8 +19,20 @@ export async function probeGatewayStatus(opts: {
         indeterminate: true,
         enabled: opts.json !== true,
       },
-      async () =>
-        await probeGateway({
+      async () => {
+        if (opts.requireRpc) {
+          await callGateway({
+            url: opts.url,
+            token: opts.token,
+            password: opts.password,
+            tlsFingerprint: opts.tlsFingerprint,
+            method: "status",
+            timeoutMs: opts.timeoutMs,
+            ...(opts.configPath ? { configPath: opts.configPath } : {}),
+          });
+          return { ok: true } as const;
+        }
+        return await probeGateway({
           url: opts.url,
           auth: {
             token: opts.token,
@@ -26,7 +41,8 @@ export async function probeGatewayStatus(opts: {
           tlsFingerprint: opts.tlsFingerprint,
           timeoutMs: opts.timeoutMs,
           includeDetails: false,
-        }),
+        });
+      },
     );
     if (result.ok) {
       return { ok: true } as const;
