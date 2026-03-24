@@ -85,6 +85,7 @@ const defaultCreateGatewayClient = (opts: GatewayClientOptions) => new GatewayCl
 const defaultGatewayCallDeps = {
   createGatewayClient: defaultCreateGatewayClient,
   loadConfig,
+  loadOrCreateDeviceIdentity,
   resolveGatewayPort,
   resolveConfigPath,
   resolveStateDir,
@@ -99,6 +100,8 @@ export const __testing = {
     gatewayCallDeps.createGatewayClient =
       deps?.createGatewayClient ?? defaultGatewayCallDeps.createGatewayClient;
     gatewayCallDeps.loadConfig = deps?.loadConfig ?? defaultGatewayCallDeps.loadConfig;
+    gatewayCallDeps.loadOrCreateDeviceIdentity =
+      deps?.loadOrCreateDeviceIdentity ?? defaultGatewayCallDeps.loadOrCreateDeviceIdentity;
     gatewayCallDeps.resolveGatewayPort =
       deps?.resolveGatewayPort ?? defaultGatewayCallDeps.resolveGatewayPort;
     gatewayCallDeps.resolveConfigPath =
@@ -115,6 +118,7 @@ export const __testing = {
   resetDepsForTests(): void {
     gatewayCallDeps.createGatewayClient = defaultGatewayCallDeps.createGatewayClient;
     gatewayCallDeps.loadConfig = defaultGatewayCallDeps.loadConfig;
+    gatewayCallDeps.loadOrCreateDeviceIdentity = defaultGatewayCallDeps.loadOrCreateDeviceIdentity;
     gatewayCallDeps.resolveGatewayPort = defaultGatewayCallDeps.resolveGatewayPort;
     gatewayCallDeps.resolveConfigPath = defaultGatewayCallDeps.resolveConfigPath;
     gatewayCallDeps.resolveStateDir = defaultGatewayCallDeps.resolveStateDir;
@@ -122,12 +126,14 @@ export const __testing = {
   },
 };
 
-function resolveDeviceIdentityForGatewayCall(): ReturnType<typeof loadOrCreateDeviceIdentity> | null {
+function resolveDeviceIdentityForGatewayCall(): ReturnType<
+  typeof loadOrCreateDeviceIdentity
+> | null {
   // Shared-auth local calls should still stay device-bound so operator scopes
   // remain available for detail RPCs such as status / system-presence /
   // last-heartbeat.
   try {
-    return loadOrCreateDeviceIdentity();
+    return gatewayCallDeps.loadOrCreateDeviceIdentity();
   } catch {
     // Read-only or restricted environments should still be able to call the
     // gateway with token/password auth without crashing before the RPC.

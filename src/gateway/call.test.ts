@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
+import type { DeviceIdentity } from "../infra/device-identity.js";
 import { captureEnv } from "../test-utils/env.js";
 import {
   loadConfigMock as loadConfig,
@@ -9,7 +10,11 @@ import {
 } from "./gateway-connection.test-mocks.js";
 
 const deviceIdentityState = vi.hoisted(() => ({
-  value: { id: "test-device-identity" } as Record<string, unknown>,
+  value: {
+    deviceId: "test-device-identity",
+    publicKeyPem: "test-public-key",
+    privateKeyPem: "test-private-key",
+  } satisfies DeviceIdentity,
   throwOnLoad: false,
 }));
 
@@ -78,15 +83,6 @@ vi.mock("./client.js", () => ({
   },
 }));
 
-vi.mock("../infra/device-identity.js", () => ({
-  loadOrCreateDeviceIdentity: () => {
-    if (deviceIdentityState.throwOnLoad) {
-      throw new Error("read-only identity dir");
-    }
-    return deviceIdentityState.value;
-  },
-}));
-
 const { __testing, buildGatewayConnectionDetails, callGateway, callGatewayCli, callGatewayScoped } =
   await import("./call.js");
 
@@ -143,6 +139,12 @@ function resetGatewayCallMocks() {
     createGatewayClient: (opts) =>
       new StubGatewayClient(opts as ConstructorParameters<typeof StubGatewayClient>[0]) as never,
     loadConfig: loadConfigForTests,
+    loadOrCreateDeviceIdentity: () => {
+      if (deviceIdentityState.throwOnLoad) {
+        throw new Error("read-only identity dir");
+      }
+      return deviceIdentityState.value;
+    },
     resolveGatewayPort: resolveGatewayPortForTests,
   });
   deviceIdentityState.throwOnLoad = false;
