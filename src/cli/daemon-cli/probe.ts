@@ -1,5 +1,3 @@
-import { callGateway } from "../../gateway/call.js";
-import { probeGateway } from "../../gateway/probe.js";
 import { withProgress } from "../progress.js";
 
 export async function probeGatewayStatus(opts: {
@@ -21,6 +19,7 @@ export async function probeGatewayStatus(opts: {
       },
       async () => {
         if (opts.requireRpc) {
+          const { callGateway } = await import("../../gateway/call.js");
           await callGateway({
             url: opts.url,
             token: opts.token,
@@ -32,6 +31,7 @@ export async function probeGatewayStatus(opts: {
           });
           return { ok: true } as const;
         }
+        const { probeGateway } = await import("../../gateway/probe.js");
         return await probeGateway({
           url: opts.url,
           auth: {
