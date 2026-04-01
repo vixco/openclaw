@@ -297,7 +297,9 @@ export function createDiscordGatewayPlugin(params: {
   const intents = resolveDiscordGatewayIntents(params.discordConfig?.intents);
   const proxy = params.discordConfig?.proxy?.trim();
   const options = {
-    reconnect: { maxAttempts: 50 },
+    // OpenClaw owns Discord gateway recovery. Keep Carbon's internal reconnect
+    // loop disabled so close/retry state has a single controller.
+    reconnect: { maxAttempts: 0 },
     intents,
     autoInteractions: true,
   };

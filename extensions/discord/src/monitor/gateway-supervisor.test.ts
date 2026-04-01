@@ -25,7 +25,7 @@ describe("classifyDiscordGatewayEvent", () => {
     });
 
     expect(reconnectEvent.type).toBe("reconnect-exhausted");
-    expect(reconnectEvent.shouldStopLifecycle).toBe(true);
+    expect(reconnectEvent.shouldStopLifecycle).toBe(false);
     expect(fatalEvent.type).toBe("fatal");
     expect(disallowedEvent.type).toBe("disallowed-intents");
     expect(transientEvent.type).toBe("other");

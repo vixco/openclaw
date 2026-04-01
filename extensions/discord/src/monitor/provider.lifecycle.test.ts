@@ -685,10 +685,11 @@ describe("runDiscordGatewayLifecycle", () => {
       const { lifecycleParams } = createLifecycleHarness({ gateway });
       await expect(runDiscordGatewayLifecycle(lifecycleParams)).resolves.toBeUndefined();
 
-      expect(gateway.disconnect).toHaveBeenCalledTimes(3);
+      expect(gateway.disconnect).toHaveBeenCalledTimes(4);
       expect(gateway.connect).toHaveBeenNthCalledWith(1, true);
       expect(gateway.connect).toHaveBeenNthCalledWith(2, true);
-      expect(gateway.connect).toHaveBeenNthCalledWith(3, false);
+      expect(gateway.connect).toHaveBeenNthCalledWith(3, true);
+      expect(gateway.connect).toHaveBeenNthCalledWith(4, false);
       expectGatewaySessionStateCleared(gateway);
     } finally {
       vi.useRealTimers();
@@ -729,11 +730,13 @@ describe("runDiscordGatewayLifecycle", () => {
       const { lifecycleParams } = createLifecycleHarness({ gateway });
       await expect(runDiscordGatewayLifecycle(lifecycleParams)).resolves.toBeUndefined();
 
-      expect(gateway.connect).toHaveBeenCalledTimes(4);
+      expect(gateway.connect).toHaveBeenCalledTimes(6);
       expect(gateway.connect).toHaveBeenNthCalledWith(1, true);
       expect(gateway.connect).toHaveBeenNthCalledWith(2, true);
       expect(gateway.connect).toHaveBeenNthCalledWith(3, true);
       expect(gateway.connect).toHaveBeenNthCalledWith(4, true);
+      expect(gateway.connect).toHaveBeenNthCalledWith(5, true);
+      expect(gateway.connect).toHaveBeenNthCalledWith(6, true);
       expect(gateway.connect).not.toHaveBeenCalledWith(false);
     } finally {
       vi.useRealTimers();
@@ -799,7 +802,7 @@ describe("runDiscordGatewayLifecycle", () => {
     }
   });
 
-  it("suppresses reconnect-exhausted already queued before shutdown", async () => {
+  it("ignores reconnect-exhausted already queued before shutdown", async () => {
     const pendingGatewayEvents: DiscordGatewayEvent[] = [];
     const abortController = new AbortController();
 
@@ -834,13 +837,15 @@ describe("runDiscordGatewayLifecycle", () => {
     abortController.abort();
 
     await expect(lifecyclePromise).resolves.toBeUndefined();
-    expect(runtimeLog).not.toHaveBeenCalledWith(
-      expect.stringContaining("ignoring expected reconnect-exhausted during shutdown"),
+    expect(runtimeLog).toHaveBeenCalledWith(
+      expect.stringContaining("ignoring gateway reconnect-exhausted event"),
     );
-    expect(runtimeError).toHaveBeenCalledWith(expect.stringContaining("Max reconnect attempts"));
+    expect(runtimeError).not.toHaveBeenCalledWith(
+      expect.stringContaining("Max reconnect attempts"),
+    );
   });
 
-  it("rejects reconnect-exhausted queued before startup when shutdown has not begun", async () => {
+  it("ignores reconnect-exhausted queued before startup when shutdown has not begun", async () => {
     const pendingGatewayEvents: DiscordGatewayEvent[] = [];
 
     const emitter = new EventEmitter();
@@ -865,9 +870,7 @@ describe("runDiscordGatewayLifecycle", () => {
       ),
     );
 
-    await expect(runDiscordGatewayLifecycle(lifecycleParams)).rejects.toThrow(
-      "Max reconnect attempts",
-    );
+    await expect(runDiscordGatewayLifecycle(lifecycleParams)).resolves.toBeUndefined();
   });
 
   it("does not push connected: true when abortSignal is already aborted", async () => {

@@ -57,8 +57,16 @@ export function createDiscordGatewayReconnectController(params: {
   let helloConnectedPollId: ReturnType<typeof setInterval> | undefined;
   let reconnectInFlight: Promise<void> | undefined;
   let consecutiveHelloStalls = 0;
+  let controlledDisconnects = 0;
 
   const shouldStop = () => params.isLifecycleStopping() || params.abortSignal?.aborted;
+  const hasResumeState = () =>
+    Boolean(
+      params.gateway?.state?.sessionId &&
+      params.gateway?.state?.resumeGatewayUrl &&
+      params.gateway?.state?.sequence !== null &&
+      params.gateway?.state?.sequence !== undefined,
+    );
   const resetHelloStallCounter = () => {
     consecutiveHelloStalls = 0;
   };
@@ -285,7 +293,12 @@ export function createDiscordGatewayReconnectController(params: {
       if (shouldStop()) {
         return;
       }
-      await disconnectGatewaySocketWithoutAutoReconnect();
+      controlledDisconnects += 1;
+      try {
+        await disconnectGatewaySocketWithoutAutoReconnect();
+      } finally {
+        controlledDisconnects = Math.max(0, controlledDisconnects - 1);
+      }
       if (shouldStop()) {
         return;
       }
@@ -315,6 +328,14 @@ export function createDiscordGatewayReconnectController(params: {
         },
       });
       clearHelloWatch();
+      if (controlledDisconnects === 0 && !shouldStop()) {
+        void reconnectGateway({ resume: hasResumeState() }).catch((err) => {
+          params.runtime.error?.(
+            danger(`discord: failed to restart closed gateway socket: ${String(err)}`),
+          );
+          triggerForceStop(err);
+        });
+      }
       return;
     }
     if (!message.includes("WebSocket connection opened")) {
@@ -384,7 +405,7 @@ export function createDiscordGatewayReconnectController(params: {
             await reconnectGatewayFresh();
             return;
           }
-          await reconnectGateway({ resume: true });
+          await reconnectGateway({ resume: hasResumeState() });
         } catch (err) {
           params.runtime.error?.(
             danger(`discord: failed to restart stalled gateway socket: ${String(err)}`),

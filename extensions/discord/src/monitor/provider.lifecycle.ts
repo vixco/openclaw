@@ -64,14 +64,12 @@ export async function runDiscordGatewayLifecycle(params: {
       );
       return "stop";
     }
-    // When we deliberately set maxAttempts=0 and disconnected (health-monitor
-    // stale-socket restart), Carbon fires "Max reconnect attempts (0)". This
-    // is expected — log at info instead of error to avoid false alarms.
-    if (lifecycleStopping && event.type === "reconnect-exhausted") {
-      params.runtime.log?.(
-        `discord: ignoring expected reconnect-exhausted during shutdown: ${event.message}`,
-      );
-      return "stop";
+    // Carbon emits reconnect-exhausted when its internal reconnect loop is
+    // disabled. OpenClaw owns reconnect, so this is transport noise rather
+    // than a lifecycle-fatal signal.
+    if (event.type === "reconnect-exhausted") {
+      params.runtime.log?.(`discord: ignoring gateway reconnect-exhausted event: ${event.message}`);
+      return lifecycleStopping ? "stop" : "continue";
     }
     params.runtime.error?.(danger(`discord gateway error: ${event.message}`));
     return event.shouldStopLifecycle ? "stop" : "continue";
@@ -82,14 +80,7 @@ export async function runDiscordGatewayLifecycle(params: {
       if (decision !== "stop") {
         return "continue";
       }
-      // Don't throw for expected shutdown events. `reconnect-exhausted` can be
-      // queued just before an abort-driven shutdown flips `lifecycleStopping`,
-      // so only suppress it when shutdown is already underway.
-      if (
-        event.type === "disallowed-intents" ||
-        (event.type === "reconnect-exhausted" &&
-          (lifecycleStopping || params.abortSignal?.aborted === true))
-      ) {
+      if (event.type === "disallowed-intents" || event.type === "reconnect-exhausted") {
         return "stop";
       }
       throw event.err;
