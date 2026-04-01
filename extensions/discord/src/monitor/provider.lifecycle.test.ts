@@ -623,6 +623,48 @@ describe("runDiscordGatewayLifecycle", () => {
     });
   });
 
+  it("does not reconnect when a close debug arrives after a fatal stop decision", async () => {
+    vi.useFakeTimers();
+    try {
+      const { emitter, gateway } = createGatewayHarness();
+      gateway.isConnected = true;
+      getDiscordGatewayEmitterMock.mockReturnValueOnce(emitter);
+      waitForDiscordGatewayStopMock.mockImplementationOnce(
+        async (
+          waitParams: WaitForDiscordGatewayStopParams & {
+            onGatewayEvent?: (event: DiscordGatewayEvent) => "continue" | "stop";
+          },
+        ) => {
+          const fatalEvent = createGatewayEvent("fatal", "Fatal Gateway error: 4001");
+          const decision = waitParams.onGatewayEvent?.(fatalEvent) ?? "stop";
+          emitter.emit("debug", "WebSocket connection closed with code 1006");
+          await vi.advanceTimersByTimeAsync(1_000);
+          if (decision === "stop") {
+            throw fatalEvent.err;
+          }
+        },
+      );
+
+      const { lifecycleParams, start, stop, threadStop, gatewaySupervisor } =
+        createLifecycleHarness({ gateway });
+
+      await expect(runDiscordGatewayLifecycle(lifecycleParams)).rejects.toThrow(
+        "Fatal Gateway error: 4001",
+      );
+
+      expect(gateway.connect).not.toHaveBeenCalled();
+      expectLifecycleCleanup({
+        start,
+        stop,
+        threadStop,
+        waitCalls: 1,
+        gatewaySupervisor,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("surfaces fatal startup gateway errors while waiting for READY", async () => {
     vi.useFakeTimers();
     try {

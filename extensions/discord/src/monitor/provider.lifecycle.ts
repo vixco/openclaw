@@ -56,6 +56,7 @@ export async function runDiscordGatewayLifecycle(params: {
   let sawDisallowedIntents = false;
   const handleGatewayEvent = (event: DiscordGatewayEvent): "continue" | "stop" => {
     if (event.type === "disallowed-intents") {
+      lifecycleStopping = true;
       sawDisallowedIntents = true;
       params.runtime.error?.(
         danger(
@@ -70,6 +71,9 @@ export async function runDiscordGatewayLifecycle(params: {
     if (event.type === "reconnect-exhausted") {
       params.runtime.log?.(`discord: ignoring gateway reconnect-exhausted event: ${event.message}`);
       return lifecycleStopping ? "stop" : "continue";
+    }
+    if (event.shouldStopLifecycle) {
+      lifecycleStopping = true;
     }
     params.runtime.error?.(danger(`discord gateway error: ${event.message}`));
     return event.shouldStopLifecycle ? "stop" : "continue";

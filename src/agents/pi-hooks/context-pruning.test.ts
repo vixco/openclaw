@@ -316,6 +316,7 @@ describe("context-pruning", () => {
     setContextPruningRuntime(sessionManager, {
       settings: makeAggressiveSettings(),
       contextWindowTokens: 1000,
+      dropThinkingBlocks: false,
       isToolPrunable: () => true,
       lastCacheTouchAt: Date.now() - DEFAULT_CONTEXT_PRUNING_SETTINGS.ttlMs - 1000,
     });
@@ -338,6 +339,7 @@ describe("context-pruning", () => {
     setContextPruningRuntime(sessionManager, {
       settings: makeAggressiveSettings(),
       contextWindowTokens: 1000,
+      dropThinkingBlocks: false,
       isToolPrunable: () => true,
       lastCacheTouchAt: lastTouch,
     });
