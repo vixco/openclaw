@@ -738,6 +738,43 @@ describe("runDiscordGatewayLifecycle", () => {
     }
   });
 
+  it.each([4007, 4009])(
+    "forces fresh identify for non-resumable close code %s",
+    async (closeCode) => {
+      vi.useFakeTimers();
+      try {
+        const { emitter, gateway } = createGatewayHarness({
+          state: {
+            sessionId: "session-nonresumable",
+            resumeGatewayUrl: "wss://gateway.discord.gg",
+            sequence: 321,
+          },
+          sequence: 321,
+        });
+        gateway.isConnected = true;
+        getDiscordGatewayEmitterMock.mockReturnValueOnce(emitter);
+        waitForDiscordGatewayStopMock.mockImplementationOnce(async () => {
+          emitter.emit("debug", `WebSocket connection closed with code ${closeCode}`);
+          gateway.isConnected = false;
+          setTimeout(() => {
+            gateway.isConnected = true;
+          }, 1_000);
+          await vi.advanceTimersByTimeAsync(2_000);
+        });
+
+        const { lifecycleParams } = createLifecycleHarness({ gateway });
+        await expect(runDiscordGatewayLifecycle(lifecycleParams)).resolves.toBeUndefined();
+
+        expect(gateway.disconnect).toHaveBeenCalledTimes(1);
+        expect(gateway.connect).toHaveBeenCalledTimes(1);
+        expect(gateway.connect).toHaveBeenCalledWith(false);
+        expectGatewaySessionStateCleared(gateway);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
   it("resets HELLO stall counter after a successful reconnect that drops quickly", async () => {
     vi.useFakeTimers();
     try {

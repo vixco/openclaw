@@ -13,6 +13,8 @@ const DISCORD_GATEWAY_HELLO_TIMEOUT_MS = 30_000;
 const DISCORD_GATEWAY_HELLO_CONNECTED_POLL_MS = 250;
 const DISCORD_GATEWAY_MAX_CONSECUTIVE_HELLO_STALLS = 3;
 const DISCORD_GATEWAY_RECONNECT_STALL_TIMEOUT_MS = 5 * 60_000;
+const DISCORD_GATEWAY_INVALID_SEQUENCE_CLOSE_CODE = 4007;
+const DISCORD_GATEWAY_SESSION_TIMEOUT_CLOSE_CODE = 4009;
 
 type GatewayReadyWaitResult = "ready" | "timeout" | "stopped";
 
@@ -88,6 +90,9 @@ export function createDiscordGatewayReconnectController(params: {
     const code = Number.parseInt(match[1], 10);
     return Number.isFinite(code) ? code : undefined;
   };
+  const shouldForceFreshIdentifyForCloseCode = (code: number | undefined): boolean =>
+    code === DISCORD_GATEWAY_INVALID_SEQUENCE_CLOSE_CODE ||
+    code === DISCORD_GATEWAY_SESSION_TIMEOUT_CLOSE_CODE;
   const clearResumeState = () => {
     if (!params.gateway?.state) {
       return;
@@ -316,6 +321,8 @@ export function createDiscordGatewayReconnectController(params: {
     const at = Date.now();
     params.pushStatus({ lastEventAt: at });
     if (message.includes("WebSocket connection closed")) {
+      const closeCode = parseGatewayCloseCode(message);
+      const forceFreshIdentify = shouldForceFreshIdentifyForCloseCode(closeCode);
       if (params.gateway?.isConnected) {
         resetHelloStallCounter();
       }
@@ -324,12 +331,15 @@ export function createDiscordGatewayReconnectController(params: {
         connected: false,
         lastDisconnect: {
           at,
-          status: parseGatewayCloseCode(message),
+          status: closeCode,
         },
       });
       clearHelloWatch();
       if (controlledDisconnects === 0 && !shouldStop()) {
-        void reconnectGateway({ resume: hasResumeState() }).catch((err) => {
+        void reconnectGateway({
+          resume: !forceFreshIdentify && hasResumeState(),
+          forceFreshIdentify,
+        }).catch((err) => {
           params.runtime.error?.(
             danger(`discord: failed to restart closed gateway socket: ${String(err)}`),
           );
