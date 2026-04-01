@@ -881,6 +881,35 @@ describe("runDiscordGatewayLifecycle", () => {
     }
   });
 
+  it("does not reconnect when force-stop teardown emits a close debug event", async () => {
+    vi.useFakeTimers();
+    try {
+      const { emitter, gateway } = createGatewayHarness();
+      gateway.isConnected = true;
+      getDiscordGatewayEmitterMock.mockReturnValueOnce(emitter);
+      waitForDiscordGatewayStopMock.mockImplementationOnce(
+        (waitParams: WaitForDiscordGatewayStopParams) =>
+          new Promise<void>((_resolve, reject) => {
+            waitParams.registerForceStop?.((err) => {
+              emitter.emit("debug", "WebSocket connection closed with code 1006");
+              reject(err);
+            });
+          }),
+      );
+      const { lifecycleParams } = createLifecycleHarness({ gateway });
+
+      const lifecyclePromise = runDiscordGatewayLifecycle(lifecycleParams);
+      lifecyclePromise.catch(() => {});
+      emitter.emit("debug", "WebSocket connection closed with code 1006");
+      await vi.advanceTimersByTimeAsync(5 * 60_000 + 1_000);
+      await expect(lifecyclePromise).rejects.toThrow("reconnect watchdog timeout");
+
+      expect(gateway.connect).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("does not force-stop when reconnect resumes before watchdog timeout", async () => {
     vi.useFakeTimers();
     try {

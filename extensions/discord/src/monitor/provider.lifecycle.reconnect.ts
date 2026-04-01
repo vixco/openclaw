@@ -62,8 +62,10 @@ export function createDiscordGatewayReconnectController(params: {
   let reconnectInFlight: Promise<void> | undefined;
   let consecutiveHelloStalls = 0;
   let controlledDisconnects = 0;
+  let forceStopRequested = false;
 
-  const shouldStop = () => params.isLifecycleStopping() || params.abortSignal?.aborted;
+  const shouldStop = () =>
+    forceStopRequested || params.isLifecycleStopping() || params.abortSignal?.aborted;
   const hasResumeState = () =>
     Boolean(
       params.gateway?.state?.sessionId &&
@@ -105,6 +107,7 @@ export function createDiscordGatewayReconnectController(params: {
     params.gateway.sequence = null;
   };
   const triggerForceStop = (err: unknown) => {
+    forceStopRequested = true;
     if (forceStopHandler) {
       forceStopHandler(err);
       return;
