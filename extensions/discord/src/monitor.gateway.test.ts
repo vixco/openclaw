@@ -43,7 +43,6 @@ function createGatewayWaitHarness() {
 function startGatewayWait(params?: {
   disconnect?: () => void;
   onGatewayEvent?: (event: DiscordGatewayEvent) => "continue" | "stop";
-  registerForceStop?: (fn: (error: unknown) => void) => void;
 }) {
   const harness = createGatewayWaitHarness();
   if (params?.disconnect) {
@@ -54,7 +53,6 @@ function startGatewayWait(params?: {
     abortSignal: harness.abort.signal,
     gatewaySupervisor: harness.gatewaySupervisor,
     ...(params?.onGatewayEvent ? { onGatewayEvent: params.onGatewayEvent } : {}),
-    ...(params?.registerForceStop ? { registerForceStop: params.registerForceStop } : {}),
   });
   return { ...harness, promise };
 }
@@ -123,41 +121,6 @@ describe("waitForDiscordGatewayStop", () => {
     abort.abort();
 
     await expect(promise).resolves.toBeUndefined();
-  });
-
-  it("rejects via registerForceStop and disconnects gateway", async () => {
-    let forceStop: ((err: unknown) => void) | undefined;
-
-    const { detachLifecycle, disconnect, promise } = startGatewayWait({
-      registerForceStop: (fn) => {
-        forceStop = fn;
-      },
-    });
-
-    if (!forceStop) {
-      throw new Error("registerForceStop did not expose a stopper callback");
-    }
-    forceStop(new Error("reconnect watchdog timeout"));
-
-    await expect(promise).rejects.toThrow("reconnect watchdog timeout");
-    expect(disconnect).toHaveBeenCalledTimes(1);
-    expect(detachLifecycle).toHaveBeenCalledTimes(1);
-  });
-
-  it("ignores forceStop after promise already settled", async () => {
-    let forceStop: ((err: unknown) => void) | undefined;
-
-    const { abort, disconnect, promise } = startGatewayWait({
-      registerForceStop: (fn) => {
-        forceStop = fn;
-      },
-    });
-
-    abort.abort();
-    await expect(promise).resolves.toBeUndefined();
-
-    forceStop?.(new Error("too late"));
-    expect(disconnect).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the lifecycle handler active until disconnect returns on abort", async () => {

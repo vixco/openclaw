@@ -5,7 +5,7 @@ import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime-env";
 type GatewayEmitter = Pick<EventEmitter, "on" | "removeListener">;
 
 const INFO_DEBUG_MARKERS = [
-  "WebSocket connection closed",
+  "Gateway websocket closed",
   "Reconnecting with backoff",
   "Attempting resume with backoff",
 ];

@@ -46,7 +46,7 @@ export function classifyDiscordGatewayEvent(params: {
       type: "reconnect-exhausted",
       err: params.err,
       message,
-      shouldStopLifecycle: false,
+      shouldStopLifecycle: true,
     };
   }
   if (message.includes("Fatal Gateway error")) {

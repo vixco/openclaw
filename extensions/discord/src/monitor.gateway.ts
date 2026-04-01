@@ -10,7 +10,6 @@ export type WaitForDiscordGatewayStopParams = {
   abortSignal?: AbortSignal;
   gatewaySupervisor?: Pick<DiscordGatewaySupervisor, "attachLifecycle" | "detachLifecycle">;
   onGatewayEvent?: (event: DiscordGatewayEvent) => "continue" | "stop";
-  registerForceStop?: (forceStop: (err: unknown) => void) => void;
 };
 
 export function getDiscordGatewayEmitter(gateway?: unknown): EventEmitter | undefined {
@@ -62,10 +61,6 @@ export async function waitForDiscordGatewayStop(
         finishReject(event.err);
       }
     };
-    const onForceStop = (err: unknown) => {
-      finishReject(err);
-    };
-
     if (abortSignal?.aborted) {
       onAbort();
       return;
@@ -73,6 +68,5 @@ export async function waitForDiscordGatewayStop(
 
     abortSignal?.addEventListener("abort", onAbort, { once: true });
     params.gatewaySupervisor?.attachLifecycle(onGatewayEvent);
-    params.registerForceStop?.(onForceStop);
   });
 }
