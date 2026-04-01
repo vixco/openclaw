@@ -15,6 +15,8 @@ const DISCORD_GATEWAY_MAX_CONSECUTIVE_HELLO_STALLS = 3;
 const DISCORD_GATEWAY_RECONNECT_STALL_TIMEOUT_MS = 5 * 60_000;
 const DISCORD_GATEWAY_INVALID_SEQUENCE_CLOSE_CODE = 4007;
 const DISCORD_GATEWAY_SESSION_TIMEOUT_CLOSE_CODE = 4009;
+const WEBSOCKET_CLOSING_READY_STATE = 2;
+const WEBSOCKET_CLOSED_READY_STATE = 3;
 
 type GatewayReadyWaitResult = "ready" | "timeout" | "stopped";
 
@@ -152,6 +154,13 @@ export function createDiscordGatewayReconnectController(params: {
     const gateway = params.gateway;
     const socket = gateway.ws;
     if (!socket) {
+      gateway.disconnect();
+      return;
+    }
+    if (
+      socket.readyState === WEBSOCKET_CLOSING_READY_STATE ||
+      socket.readyState === WEBSOCKET_CLOSED_READY_STATE
+    ) {
       gateway.disconnect();
       return;
     }

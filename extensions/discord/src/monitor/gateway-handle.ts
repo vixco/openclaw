@@ -11,6 +11,7 @@ export type DiscordGatewaySocket = {
   on: (event: "close" | "error", listener: GatewaySocketListener) => unknown;
   listeners: (event: "close" | "error") => GatewaySocketListener[];
   removeListener: (event: "close" | "error", listener: GatewaySocketListener) => unknown;
+  readyState?: number;
   terminate?: () => void;
 };
 

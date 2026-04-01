@@ -425,6 +425,40 @@ describe("runDiscordGatewayLifecycle", () => {
     }
   });
 
+  it("does not wait for another close when gateway.ws already points at a closed socket", async () => {
+    vi.useFakeTimers();
+    try {
+      const socket = Object.assign(new EventEmitter(), {
+        readyState: 3,
+        terminate: vi.fn(),
+      });
+      const { emitter, gateway } = createGatewayHarness({ ws: socket });
+      getDiscordGatewayEmitterMock.mockReturnValueOnce(emitter);
+      gateway.isConnected = true;
+      gateway.connect.mockImplementation((_resume?: boolean) => {
+        setTimeout(() => {
+          gateway.isConnected = true;
+        }, 1_000);
+      });
+
+      const { lifecycleParams, runtimeError } = createLifecycleHarness({ gateway });
+      const lifecyclePromise = runDiscordGatewayLifecycle(lifecycleParams);
+      emitter.emit("debug", "WebSocket connection closed with code 1006");
+      await vi.advanceTimersByTimeAsync(2_000);
+      await expect(lifecyclePromise).resolves.toBeUndefined();
+
+      expect(gateway.disconnect).toHaveBeenCalledTimes(1);
+      expect(gateway.connect).toHaveBeenCalledTimes(1);
+      expect(gateway.connect).toHaveBeenCalledWith(false);
+      expect(socket.terminate).not.toHaveBeenCalled();
+      expect(runtimeError).not.toHaveBeenCalledWith(
+        expect.stringContaining("gateway socket did not close within 5000ms before reconnect"),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("fails closed when forced terminate still does not close the old socket", async () => {
     vi.useFakeTimers();
     try {
