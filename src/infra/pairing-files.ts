@@ -41,6 +41,11 @@ export async function reconcilePendingPairingRequests<
   canRefreshSingle: (existing: TPending, incoming: TIncoming) => boolean;
   refreshSingle: (existing: TPending, incoming: TIncoming) => TPending;
   buildReplacement: (params: { existing: readonly TPending[]; incoming: TIncoming }) => TPending;
+  shouldReuseReplacementRequestId?: (params: {
+    existing: readonly TPending[];
+    incoming: TIncoming;
+    request: TPending;
+  }) => boolean;
   persist: () => Promise<void>;
 }): Promise<PendingPairingRequestResult<TPending>> {
   if (
@@ -63,7 +68,13 @@ export async function reconcilePendingPairingRequests<
     incoming: params.incoming,
   });
   const reconciledRequest =
-    replacementRequestId && request.requestId !== replacementRequestId
+    replacementRequestId &&
+    request.requestId !== replacementRequestId &&
+    params.shouldReuseReplacementRequestId?.({
+      existing: params.existing,
+      incoming: params.incoming,
+      request,
+    }) !== false
       ? { ...request, requestId: replacementRequestId }
       : request;
   params.pendingById[reconciledRequest.requestId] = reconciledRequest;

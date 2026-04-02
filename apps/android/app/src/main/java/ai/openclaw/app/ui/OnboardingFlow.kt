@@ -244,6 +244,10 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
       viewModel.setOnboardingCompleted(true)
     }
   }
+  val resetGatewayAttempt = {
+    gatewayError = null
+    attemptedConnect = false
+  }
 
   val lifecycleOwner = LocalLifecycleOwner.current
   val qrScannerOptions =
@@ -587,8 +591,7 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     }
                     setupCode = scannedSetupCode
                     gatewayInputMode = GatewayInputMode.SetupCode
-                    gatewayError = null
-                    attemptedConnect = false
+                    resetGatewayAttempt()
                   }
                   .addOnCanceledListener {
                     // User dismissed the scanner; preserve current form state.
@@ -600,23 +603,32 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
               onAdvancedOpenChange = { gatewayAdvancedOpen = it },
               onInputModeChange = {
                 gatewayInputMode = it
-                gatewayError = null
+                resetGatewayAttempt()
               },
               onSetupCodeChange = {
                 setupCode = it
-                gatewayError = null
+                resetGatewayAttempt()
               },
               onManualHostChange = {
                 manualHost = it
-                gatewayError = null
+                resetGatewayAttempt()
               },
               onManualPortChange = {
                 manualPort = it
-                gatewayError = null
+                resetGatewayAttempt()
               },
-              onManualTlsChange = { manualTls = it },
-              onTokenChange = viewModel::setGatewayToken,
-              onPasswordChange = { gatewayPassword = it },
+              onManualTlsChange = {
+                manualTls = it
+                resetGatewayAttempt()
+              },
+              onTokenChange = {
+                viewModel.setGatewayToken(it)
+                resetGatewayAttempt()
+              },
+              onPasswordChange = {
+                gatewayPassword = it
+                resetGatewayAttempt()
+              },
             )
           OnboardingStep.Permissions ->
             PermissionsStep(

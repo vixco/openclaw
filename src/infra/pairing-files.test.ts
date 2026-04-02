@@ -85,4 +85,37 @@ describe("pairing file helpers", () => {
       "req-2": { requestId: "req-2", deviceId: "device-2", ts: 3, isRepair: true },
     });
   });
+
+  it("keeps the new request id when replacement identity changes", async () => {
+    const persist = vi.fn(async () => undefined);
+    const pendingById = {
+      "req-1": { requestId: "req-1", deviceId: "device-2", publicKey: "key-1", ts: 1 },
+    };
+
+    await expect(
+      reconcilePendingPairingRequests({
+        pendingById,
+        existing: Object.values(pendingById),
+        incoming: { deviceId: "device-2", publicKey: "key-2" },
+        canRefreshSingle: () => false,
+        refreshSingle: (pending) => pending,
+        buildReplacement: vi.fn(() => ({
+          requestId: "req-2",
+          deviceId: "device-2",
+          publicKey: "key-2",
+          ts: 2,
+        })),
+        shouldReuseReplacementRequestId: ({ existing, incoming }) =>
+          existing.every((pending) => pending.publicKey === incoming.publicKey),
+        persist,
+      }),
+    ).resolves.toEqual({
+      status: "pending",
+      request: { requestId: "req-2", deviceId: "device-2", publicKey: "key-2", ts: 2 },
+      created: true,
+    });
+    expect(pendingById).toEqual({
+      "req-2": { requestId: "req-2", deviceId: "device-2", publicKey: "key-2", ts: 2 },
+    });
+  });
 });
