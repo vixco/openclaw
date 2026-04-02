@@ -361,6 +361,10 @@ function buildDeviceAuthToken(params: {
   };
 }
 
+function resolveRequestedDeviceTokenScopes(role: string, scopes: string[] | undefined): string[] {
+  return role === "operator" ? normalizeDeviceAuthScopes(scopes) : [];
+}
+
 function resolveApprovedDeviceScopeBaseline(device: PairedDevice): string[] | null {
   const baseline = device.approvedScopes ?? device.scopes;
   if (!Array.isArray(baseline)) {
@@ -520,20 +524,19 @@ export async function approveDevicePairing(
       pending.scopes,
     );
     const tokens = existing?.tokens ? { ...existing.tokens } : {};
-    const roleForToken = normalizeRole(pending.role);
-    if (roleForToken) {
+    for (const roleForToken of roles ?? []) {
       const existingToken = tokens[roleForToken];
-      const requestedScopes = normalizeDeviceAuthScopes(pending.scopes);
+      const requestedScopes = resolveRequestedDeviceTokenScopes(roleForToken, pending.scopes);
       const nextScopes =
         requestedScopes.length > 0
           ? requestedScopes
-          : normalizeDeviceAuthScopes(
+          : resolveRequestedDeviceTokenScopes(
+              roleForToken,
               existingToken?.scopes ??
                 approvedScopes ??
                 existing?.approvedScopes ??
                 existing?.scopes,
             );
-      const now = Date.now();
       tokens[roleForToken] = {
         token: newToken(),
         role: roleForToken,

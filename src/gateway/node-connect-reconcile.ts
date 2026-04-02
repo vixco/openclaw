@@ -16,10 +16,16 @@ type PendingNodePairingResult = {
   created: boolean;
 };
 
+type ApprovedNodePairingResult = {
+  requestId: string;
+  node: NodePairingPairedNode;
+};
+
 export type NodeConnectPairingReconcileResult = {
   nodeId: string;
   effectiveCommands: string[];
   pendingPairing?: PendingNodePairingResult;
+  approvedPairing?: ApprovedNodePairingResult;
 };
 
 function buildNodePairingRequestInput(params: {
@@ -46,7 +52,9 @@ export async function reconcileNodePairingOnConnect(params: {
   connectParams: ConnectParams;
   pairedNode: NodePairingPairedNode | null;
   reportedClientIp?: string;
+  allowImplicitPairing: boolean;
   requestPairing: (input: NodePairingRequestInput) => Promise<PendingNodePairingResult>;
+  approvePairing: (requestId: string) => Promise<ApprovedNodePairingResult | null>;
 }): Promise<NodeConnectPairingReconcileResult> {
   const nodeId = params.connectParams.device?.id ?? params.connectParams.client.id;
   const allowlist = resolveNodeCommandAllowlist(params.cfg, {
@@ -69,6 +77,16 @@ export async function reconcileNodePairingOnConnect(params: {
         remoteIp: params.reportedClientIp,
       }),
     );
+    if (params.allowImplicitPairing) {
+      const approvedPairing = await params.approvePairing(pendingPairing.request.requestId);
+      if (approvedPairing) {
+        return {
+          nodeId,
+          effectiveCommands: declared,
+          approvedPairing,
+        };
+      }
+    }
     return {
       nodeId,
       effectiveCommands: declared,

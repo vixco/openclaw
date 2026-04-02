@@ -22,6 +22,7 @@ import {
   verifyDeviceToken,
 } from "../../../infra/device-pairing.js";
 import {
+  approveNodePairing,
   getPairedNode,
   requestNodePairing,
   updatePairedNodeMetadata,
@@ -711,6 +712,7 @@ export function attachGatewayWsMessageHandler(params: {
           trustedProxyAuthOk,
           resolvedAuth.mode,
         );
+        let pairedDeviceForConnect: Awaited<ReturnType<typeof getPairedDevice>> | null = null;
         if (device && devicePublicKey && !skipPairing) {
           const formatAuditList = (items: string[] | undefined): string => {
             if (!items || items.length === 0) {
@@ -806,9 +808,7 @@ export function attachGatewayWsMessageHandler(params: {
               authMethod === "bootstrap-token" && bootstrapProfile && !allowSilentBootstrapPairing
                 ? {
                     ...clientPairingMetadata,
-                    role: bootstrapProfile.roles[0] ?? role,
                     roles: bootstrapProfile.roles,
-                    scopes: bootstrapProfile.scopes,
                   }
                 : clientPairingMetadata;
             const pairing = await requestDevicePairing({
@@ -915,12 +915,14 @@ export function attachGatewayWsMessageHandler(params: {
           };
 
           const paired = await getPairedDevice(device.id);
+          pairedDeviceForConnect = paired;
           const isPaired = paired?.publicKey === devicePublicKey;
           if (!isPaired) {
             const ok = await requirePairing("not-paired", paired);
             if (!ok) {
               return;
             }
+            pairedDeviceForConnect = await getPairedDevice(device.id);
           } else {
             const claimedPlatform = connectParams.client.platform;
             const pairedPlatform = paired.platform;
@@ -996,6 +998,7 @@ export function attachGatewayWsMessageHandler(params: {
             // Metadata pinning is approval-bound. Reconnects can update access metadata,
             // but platform/device family must stay on the approved pairing record.
             await updatePairedDeviceMetadata(device.id, clientAccessMetadata);
+            pairedDeviceForConnect = await getPairedDevice(device.id);
           }
         }
 
@@ -1010,12 +1013,29 @@ export function attachGatewayWsMessageHandler(params: {
             pairedNode: await getPairedNode(connectParams.device?.id ?? connectParams.client.id),
             reportedClientIp,
             requestPairing: async (input) => await requestNodePairing(input),
+            approvePairing: async (requestId) => await approveNodePairing(requestId),
+            allowImplicitPairing:
+              pairedDeviceForConnect !== null &&
+              hasEffectivePairedDeviceRole(pairedDeviceForConnect, "node"),
           });
           if (reconciliation.pendingPairing?.created) {
             const requestContext = buildRequestContext();
             requestContext.broadcast("node.pair.requested", reconciliation.pendingPairing.request, {
               dropIfSlow: true,
             });
+          }
+          if (reconciliation.approvedPairing) {
+            const requestContext = buildRequestContext();
+            requestContext.broadcast(
+              "node.pair.resolved",
+              {
+                requestId: reconciliation.approvedPairing.requestId,
+                nodeId: reconciliation.approvedPairing.node.nodeId,
+                decision: "approved",
+                ts: Date.now(),
+              },
+              { dropIfSlow: true },
+            );
           }
           connectParams.commands = reconciliation.effectiveCommands;
         }

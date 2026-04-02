@@ -923,6 +923,7 @@ export function registerControlUiAndPairingSuite(): void {
     const { issueDeviceBootstrapToken } = await import("../infra/device-bootstrap.js");
     const { approveDevicePairing, getPairedDevice, listDevicePairing } =
       await import("../infra/device-pairing.js");
+    const { getPairedNode, listNodePairing } = await import("../infra/node-pairing.js");
     const { server, ws, port, prevToken } = await startServerWithClient("secret");
     ws.close();
 
@@ -952,9 +953,7 @@ export function registerControlUiAndPairingSuite(): void {
       );
       expect(pendingForDevice).toHaveLength(1);
       expect(pendingForDevice[0]?.roles).toEqual(expect.arrayContaining(["node", "operator"]));
-      expect(pendingForDevice[0]?.scopes ?? []).toEqual(
-        expect.arrayContaining(["operator.read", "operator.write", "operator.talk.secrets"]),
-      );
+      expect(pendingForDevice[0]?.scopes ?? []).toEqual(["operator.read"]);
       if (!pendingForDevice[0]) {
         throw new Error("expected pending pairing request");
       }
@@ -965,16 +964,17 @@ export function registerControlUiAndPairingSuite(): void {
 
       const paired = await getPairedDevice(identity.deviceId);
       expect(paired?.roles).toEqual(expect.arrayContaining(["node", "operator"]));
-      expect(paired?.approvedScopes).toEqual(
-        expect.arrayContaining(["operator.read", "operator.write", "operator.talk.secrets"]),
-      );
+      expect(paired?.approvedScopes).toEqual(["operator.read"]);
+      expect(paired?.tokens?.node?.scopes).toEqual([]);
+      const nodeToken = paired?.tokens?.node?.token;
+      expect(nodeToken).toBeDefined();
 
       wsOperator.close();
 
       const wsNode = await openWs(port, REMOTE_BOOTSTRAP_HEADERS);
       const nodeConnect = await connectReq(wsNode, {
         skipDefaultAuth: true,
-        bootstrapToken: issued.token,
+        deviceToken: nodeToken,
         role: "node",
         scopes: [],
         client: {
@@ -990,6 +990,8 @@ export function registerControlUiAndPairingSuite(): void {
       expect(
         pendingAfterApproval.pending.filter((entry) => entry.deviceId === identity.deviceId),
       ).toEqual([]);
+      expect((await listNodePairing()).pending).toEqual([]);
+      expect(await getPairedNode(identity.deviceId)).toBeTruthy();
     } finally {
       await server.close();
       restoreGatewayToken(prevToken);

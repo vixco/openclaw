@@ -182,6 +182,10 @@ describe("device pairing tokens", () => {
     const paired = await getPairedDevice("device-1", baseDir);
     expect(paired?.roles).toEqual(expect.arrayContaining(["node", "operator"]));
     expect(paired?.scopes).toEqual(expect.arrayContaining(["operator.read", "operator.write"]));
+    expect(paired?.tokens?.operator?.scopes).toEqual(
+      expect.arrayContaining(["operator.read", "operator.write"]),
+    );
+    expect(paired?.tokens?.node?.scopes).toEqual([]);
   });
 
   test("keeps pending requests interactive when an existing pending request is interactive", async () => {
