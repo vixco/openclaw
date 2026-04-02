@@ -8,13 +8,13 @@ import { installGatewayTestHooks } from "./test-helpers.js";
 
 installGatewayTestHooks({ scope: "suite" });
 
-describe("gateway device.pair.approve superseded request ids", () => {
-  test("rejects approving a superseded request id", async () => {
+describe("gateway device.pair.approve pending request reconciliation", () => {
+  test("approves the same pending request id after a scope upgrade reconnect", async () => {
     const first = await requestDevicePairing({
       deviceId: "supersede-device-1",
       publicKey: "supersede-public-key",
       role: "node",
-      scopes: ["node.exec"],
+      scopes: [],
     });
     const second = await requestDevicePairing({
       deviceId: "supersede-device-1",
@@ -23,17 +23,12 @@ describe("gateway device.pair.approve superseded request ids", () => {
       scopes: ["operator.admin"],
     });
 
-    expect(second.request.requestId).not.toBe(first.request.requestId);
+    expect(second.request.requestId).toBe(first.request.requestId);
 
-    const staleApprove = await approveDevicePairing(first.request.requestId, {
+    const approved = await approveDevicePairing(first.request.requestId, {
       callerScopes: ["operator.admin"],
     });
-    expect(staleApprove).toBeNull();
-
-    const latestApprove = await approveDevicePairing(second.request.requestId, {
-      callerScopes: ["operator.admin"],
-    });
-    expect(latestApprove?.status).toBe("approved");
+    expect(approved?.status).toBe("approved");
 
     const paired = await getPairedDevice("supersede-device-1");
     expect(paired?.roles).toEqual(expect.arrayContaining(["node", "operator"]));

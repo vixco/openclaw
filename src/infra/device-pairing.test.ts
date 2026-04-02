@@ -141,7 +141,7 @@ describe("device pairing tokens", () => {
     expect(second.request.requestId).toBe(first.request.requestId);
   });
 
-  test("supersedes pending requests when requested roles/scopes change", async () => {
+  test("keeps the pending request id stable when requested roles/scopes change", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "openclaw-device-pairing-"));
     const first = await requestDevicePairing(
       {
@@ -163,7 +163,7 @@ describe("device pairing tokens", () => {
     );
 
     expect(second.created).toBe(true);
-    expect(second.request.requestId).not.toBe(first.request.requestId);
+    expect(second.request.requestId).toBe(first.request.requestId);
     expect(second.request.role).toBe("operator");
     expect(second.request.roles).toEqual(expect.arrayContaining(["node", "operator"]));
     expect(second.request.scopes).toEqual(
@@ -184,7 +184,7 @@ describe("device pairing tokens", () => {
     expect(paired?.scopes).toEqual(expect.arrayContaining(["operator.read", "operator.write"]));
   });
 
-  test("keeps superseded requests interactive when an existing pending request is interactive", async () => {
+  test("keeps pending requests interactive when an existing pending request is interactive", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "openclaw-device-pairing-"));
     const first = await requestDevicePairing(
       {
@@ -210,7 +210,7 @@ describe("device pairing tokens", () => {
     );
 
     expect(second.created).toBe(true);
-    expect(second.request.requestId).not.toBe(first.request.requestId);
+    expect(second.request.requestId).toBe(first.request.requestId);
     expect(second.request.silent).toBe(false);
   });
 

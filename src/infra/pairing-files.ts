@@ -53,6 +53,7 @@ export async function reconcilePendingPairingRequests<
     return { status: "pending", request: refreshed, created: false };
   }
 
+  const replacementRequestId = params.existing[0]?.requestId;
   for (const existing of params.existing) {
     delete params.pendingById[existing.requestId];
   }
@@ -61,7 +62,11 @@ export async function reconcilePendingPairingRequests<
     existing: params.existing,
     incoming: params.incoming,
   });
-  params.pendingById[request.requestId] = request;
+  const reconciledRequest =
+    replacementRequestId && request.requestId !== replacementRequestId
+      ? { ...request, requestId: replacementRequestId }
+      : request;
+  params.pendingById[reconciledRequest.requestId] = reconciledRequest;
   await params.persist();
-  return { status: "pending", request, created: true };
+  return { status: "pending", request: reconciledRequest, created: true };
 }

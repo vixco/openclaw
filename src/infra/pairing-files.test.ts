@@ -53,7 +53,7 @@ describe("pairing file helpers", () => {
     expect(persist).toHaveBeenCalledOnce();
   });
 
-  it("replaces existing pending requests with one merged request", async () => {
+  it("reuses the latest request id when replacing pending requests", async () => {
     const persist = vi.fn(async () => undefined);
     const pendingById = {
       "req-1": { requestId: "req-1", deviceId: "device-2", ts: 1 },
@@ -77,12 +77,12 @@ describe("pairing file helpers", () => {
       }),
     ).resolves.toEqual({
       status: "pending",
-      request: { requestId: "req-3", deviceId: "device-2", ts: 3, isRepair: true },
+      request: { requestId: "req-2", deviceId: "device-2", ts: 3, isRepair: true },
       created: true,
     });
     expect(persist).toHaveBeenCalledOnce();
     expect(pendingById).toEqual({
-      "req-3": { requestId: "req-3", deviceId: "device-2", ts: 3, isRepair: true },
+      "req-2": { requestId: "req-2", deviceId: "device-2", ts: 3, isRepair: true },
     });
   });
 });
