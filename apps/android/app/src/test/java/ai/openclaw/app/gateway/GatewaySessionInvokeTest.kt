@@ -222,6 +222,7 @@ class GatewaySessionInvokeTest {
     val secondConnectAuth = CompletableDeferred<JsonObject?>()
     val connectAttempts = AtomicInteger(0)
     val lastDisconnect = AtomicReference("")
+    val disconnectMessages = mutableListOf<String>()
     val server =
       startGatewayServer(json) { webSocket, id, method, frame ->
         when (method) {
@@ -253,6 +254,7 @@ class GatewaySessionInvokeTest {
       createNodeHarness(
         connected = connected,
         lastDisconnect = lastDisconnect,
+        onDisconnected = { message -> disconnectMessages += message },
       ) { GatewaySession.InvokeResult.ok("""{"handled":true}""") }
 
     try {
@@ -270,6 +272,7 @@ class GatewaySessionInvokeTest {
       assertEquals("bootstrap-token", firstAuth?.get("bootstrapToken")?.jsonPrimitive?.content)
       assertEquals("bootstrap-token", secondAuth?.get("bootstrapToken")?.jsonPrimitive?.content)
       assertTrue(connectAttempts.get() >= 2)
+      assertTrue(disconnectMessages.contains("Waiting for approval…"))
     } finally {
       shutdownHarness(harness, server)
     }
@@ -397,6 +400,7 @@ class GatewaySessionInvokeTest {
   private fun createNodeHarness(
     connected: CompletableDeferred<Unit>,
     lastDisconnect: AtomicReference<String>,
+    onDisconnected: ((String) -> Unit)? = null,
     onInvoke: (GatewaySession.InvokeRequest) -> GatewaySession.InvokeResult,
   ): NodeHarness {
     val app = RuntimeEnvironment.getApplication()
@@ -412,6 +416,7 @@ class GatewaySessionInvokeTest {
         },
         onDisconnected = { message ->
           lastDisconnect.set(message)
+          onDisconnected?.invoke(message)
         },
         onEvent = { _, _ -> },
         onInvoke = onInvoke,

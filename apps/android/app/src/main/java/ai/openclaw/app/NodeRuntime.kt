@@ -1251,7 +1251,7 @@ internal fun shouldConnectOperatorSession(
 
 internal fun isOperatorApprovalPendingStatus(statusText: String): Boolean {
   val lower = statusText.trim().lowercase()
-  return lower.contains("pairing required") || lower.contains("approve")
+  return lower.contains("pairing required") || lower.contains("approve") || lower.contains("waiting for approval")
 }
 
 private enum class HomeCanvasGatewayState {

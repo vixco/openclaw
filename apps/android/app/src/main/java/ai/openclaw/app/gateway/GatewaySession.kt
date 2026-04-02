@@ -139,6 +139,7 @@ class GatewaySession(
   @Volatile private var pendingDeviceTokenRetry = false
   @Volatile private var deviceTokenRetryBudgetUsed = false
   @Volatile private var reconnectPausedForAuthFailure = false
+  @Volatile private var pairingApprovalRetryPending = false
 
   fun connect(
     endpoint: GatewayEndpoint,
@@ -152,6 +153,7 @@ class GatewaySession(
     pendingDeviceTokenRetry = false
     deviceTokenRetryBudgetUsed = false
     reconnectPausedForAuthFailure = false
+    pairingApprovalRetryPending = false
     if (job == null) {
       job = scope.launch(Dispatchers.IO) { runLoop() }
     }
@@ -162,6 +164,7 @@ class GatewaySession(
     pendingDeviceTokenRetry = false
     deviceTokenRetryBudgetUsed = false
     reconnectPausedForAuthFailure = false
+    pairingApprovalRetryPending = false
     currentConnection?.closeQuietly()
     scope.launch(Dispatchers.IO) {
       job?.cancelAndJoin()
@@ -435,6 +438,7 @@ class GatewaySession(
       pendingDeviceTokenRetry = false
       deviceTokenRetryBudgetUsed = false
       reconnectPausedForAuthFailure = false
+      pairingApprovalRetryPending = false
       val serverName = obj["server"].asObjectOrNull()?.get("host").asStringOrNull()
       val authObj = obj["auth"].asObjectOrNull()
       val deviceToken = authObj?.get("deviceToken").asStringOrNull()
@@ -699,11 +703,15 @@ class GatewaySession(
       }
 
       try {
-        onDisconnected(if (attempt == 0) "Connecting…" else "Reconnecting…")
+        onDisconnected(resolveReconnectNotice(attempt, target.options))
         connectOnce(target)
         attempt = 0
       } catch (err: Throwable) {
         attempt += 1
+        pairingApprovalRetryPending =
+          err is GatewayConnectFailure &&
+            err.gatewayError.details?.code == "PAIRING_REQUIRED" &&
+            target.options.retryOnPairingRequired
         onDisconnected("Gateway error: ${err.message ?: err::class.java.simpleName}")
         if (
           err is GatewayConnectFailure &&
@@ -716,6 +724,17 @@ class GatewaySession(
         delay(sleepMs)
       }
     }
+  }
+
+  private fun resolveReconnectNotice(
+    attempt: Int,
+    options: GatewayConnectOptions,
+  ): String {
+    if (attempt == 0) return "Connecting…"
+    if (pairingApprovalRetryPending && options.retryOnPairingRequired) {
+      return "Waiting for approval…"
+    }
+    return "Reconnecting…"
   }
 
   private suspend fun connectOnce(target: DesiredConnection) = withContext(Dispatchers.IO) {

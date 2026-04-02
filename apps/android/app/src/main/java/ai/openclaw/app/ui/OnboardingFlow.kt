@@ -750,7 +750,6 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
               parsedGateway = parseGatewayEndpoint(gatewayUrl),
               statusText = statusText,
               isConnected = canFinishOnboarding,
-              isNodeConnected = isNodeConnected,
               waitingForApproval = waitingForApproval,
               serverName = serverName,
               remoteAddress = remoteAddress,
@@ -916,12 +915,8 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                 modifier = Modifier.weight(1f).height(52.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = onboardingPrimaryButtonColors(),
-                enabled = !waitingForApproval,
               ) {
-                Text(
-                  if (waitingForApproval) "Waiting for approval" else "Connect",
-                  style = onboardingHeadlineStyle.copy(fontWeight = FontWeight.Bold),
-                )
+                Text("Connect", style = onboardingHeadlineStyle.copy(fontWeight = FontWeight.Bold))
               }
             }
           }
@@ -1565,7 +1560,6 @@ private fun FinalStep(
   parsedGateway: GatewayEndpointConfig?,
   statusText: String,
   isConnected: Boolean,
-  isNodeConnected: Boolean,
   waitingForApproval: Boolean,
   serverName: String?,
   remoteAddress: String?,
@@ -1702,11 +1696,7 @@ private fun FinalStep(
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
               Text("Waiting for Approval", style = onboardingHeadlineStyle, color = onboardingAccent)
               Text(
-                if (isNodeConnected) {
-                  "Phone linked. Approve operator access on the gateway host."
-                } else {
-                  "Approve this phone on the gateway host."
-                },
+                "Phone linked. Approve operator access on the gateway host.",
                 style = onboardingCalloutStyle,
                 color = onboardingTextSecondary,
               )
