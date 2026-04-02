@@ -231,7 +231,13 @@ describe("device pairing tokens", () => {
         scopes: ["operator.read"],
         baseDir,
       }),
-    ).resolves.toEqual({ ok: true });
+    ).resolves.toEqual({
+      ok: true,
+      allowedProfile: {
+        roles: ["operator"],
+        scopes: ["operator.read"],
+      },
+    });
 
     const first = await requestDevicePairing(
       {

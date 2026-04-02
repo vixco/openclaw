@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { PAIRING_SETUP_BOOTSTRAP_PROFILE } from "../shared/device-bootstrap-profile.js";
 import { createTrackedTempDirs } from "../test-utils/tracked-temp-dirs.js";
 import {
   clearDeviceBootstrapTokens,
@@ -74,8 +75,14 @@ describe("device bootstrap tokens", () => {
     const baseDir = await createTempDir();
     const issued = await issueDeviceBootstrapToken({ baseDir });
 
-    await expect(verifyBootstrapToken(baseDir, issued.token)).resolves.toEqual({ ok: true });
-    await expect(verifyBootstrapToken(baseDir, issued.token)).resolves.toEqual({ ok: true });
+    await expect(verifyBootstrapToken(baseDir, issued.token)).resolves.toEqual({
+      ok: true,
+      allowedProfile: PAIRING_SETUP_BOOTSTRAP_PROFILE,
+    });
+    await expect(verifyBootstrapToken(baseDir, issued.token)).resolves.toEqual({
+      ok: true,
+      allowedProfile: PAIRING_SETUP_BOOTSTRAP_PROFILE,
+    });
 
     const raw = await fs.readFile(resolveBootstrapPath(baseDir), "utf8");
     const parsed = JSON.parse(raw) as Record<
@@ -126,7 +133,10 @@ describe("device bootstrap tokens", () => {
       reason: "bootstrap_token_invalid",
     });
 
-    await expect(verifyBootstrapToken(baseDir, second.token)).resolves.toEqual({ ok: true });
+    await expect(verifyBootstrapToken(baseDir, second.token)).resolves.toEqual({
+      ok: true,
+      allowedProfile: PAIRING_SETUP_BOOTSTRAP_PROFILE,
+    });
   });
 
   it("verifies bootstrap tokens by the persisted map key and binds them", async () => {
@@ -154,7 +164,10 @@ describe("device bootstrap tokens", () => {
       "utf8",
     );
 
-    await expect(verifyBootstrapToken(baseDir, issued.token)).resolves.toEqual({ ok: true });
+    await expect(verifyBootstrapToken(baseDir, issued.token)).resolves.toEqual({
+      ok: true,
+      allowedProfile: PAIRING_SETUP_BOOTSTRAP_PROFILE,
+    });
 
     const raw = await fs.readFile(bootstrapPath, "utf8");
     const parsed = JSON.parse(raw) as Record<
@@ -206,7 +219,10 @@ describe("device bootstrap tokens", () => {
         role: "operator",
         scopes: ["operator.read"],
       }),
-    ).resolves.toEqual({ ok: true });
+    ).resolves.toEqual({
+      ok: true,
+      allowedProfile: PAIRING_SETUP_BOOTSTRAP_PROFILE,
+    });
   });
 
   it("supports explicitly bound bootstrap profiles", async () => {
@@ -234,7 +250,13 @@ describe("device bootstrap tokens", () => {
         role: "operator",
         scopes: ["operator.read"],
       }),
-    ).resolves.toEqual({ ok: true });
+    ).resolves.toEqual({
+      ok: true,
+      allowedProfile: {
+        roles: ["operator"],
+        scopes: ["operator.read"],
+      },
+    });
   });
 
   it("accepts trimmed bootstrap tokens and binds them", async () => {
@@ -243,6 +265,7 @@ describe("device bootstrap tokens", () => {
 
     await expect(verifyBootstrapToken(baseDir, `  ${issued.token}  `)).resolves.toEqual({
       ok: true,
+      allowedProfile: PAIRING_SETUP_BOOTSTRAP_PROFILE,
     });
 
     const raw = await fs.readFile(resolveBootstrapPath(baseDir), "utf8");
@@ -292,7 +315,10 @@ describe("device bootstrap tokens", () => {
     const baseDir = await createTempDir();
     const issued = await issueDeviceBootstrapToken({ baseDir });
 
-    await expect(verifyBootstrapToken(baseDir, issued.token)).resolves.toEqual({ ok: true });
+    await expect(verifyBootstrapToken(baseDir, issued.token)).resolves.toEqual({
+      ok: true,
+      allowedProfile: PAIRING_SETUP_BOOTSTRAP_PROFILE,
+    });
     await expect(
       verifyBootstrapToken(baseDir, issued.token, {
         deviceId: "device-456",

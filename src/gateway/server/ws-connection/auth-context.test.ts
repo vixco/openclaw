@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { PAIRING_SETUP_BOOTSTRAP_PROFILE } from "../../../shared/device-bootstrap-profile.js";
 import type { AuthRateLimiter } from "../../auth-rate-limit.js";
 import { resolveConnectAuthDecision, type ConnectAuthState } from "./auth-context.js";
 
@@ -118,7 +119,10 @@ describe("resolveConnectAuthDecision", () => {
   });
 
   it("accepts valid bootstrap tokens before device-token fallback", async () => {
-    const verifyBootstrapToken = vi.fn<VerifyBootstrapTokenFn>(async () => ({ ok: true }));
+    const verifyBootstrapToken = vi.fn<VerifyBootstrapTokenFn>(async () => ({
+      ok: true,
+      allowedProfile: PAIRING_SETUP_BOOTSTRAP_PROFILE,
+    }));
     const verifyDeviceToken = vi.fn<VerifyDeviceTokenFn>(async () => ({ ok: true }));
     const decision = await resolveDeviceTokenDecision({
       verifyBootstrapToken,
@@ -170,7 +174,10 @@ describe("resolveConnectAuthDecision", () => {
   });
 
   it("prefers a valid bootstrap token over an already successful shared auth path", async () => {
-    const verifyBootstrapToken = vi.fn<VerifyBootstrapTokenFn>(async () => ({ ok: true }));
+    const verifyBootstrapToken = vi.fn<VerifyBootstrapTokenFn>(async () => ({
+      ok: true,
+      allowedProfile: PAIRING_SETUP_BOOTSTRAP_PROFILE,
+    }));
     const verifyDeviceToken = vi.fn<VerifyDeviceTokenFn>(async () => ({ ok: true }));
     const decision = await resolveConnectAuthDecision({
       state: createBaseState({

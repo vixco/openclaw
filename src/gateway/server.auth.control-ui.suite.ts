@@ -919,6 +919,83 @@ export function registerControlUiAndPairingSuite(): void {
     }
   });
 
+  test("setup bootstrap profile uses one approval for combined node and operator access", async () => {
+    const { issueDeviceBootstrapToken } = await import("../infra/device-bootstrap.js");
+    const { approveDevicePairing, getPairedDevice, listDevicePairing } =
+      await import("../infra/device-pairing.js");
+    const { server, ws, port, prevToken } = await startServerWithClient("secret");
+    ws.close();
+
+    const { identityPath, identity, client } = await createOperatorIdentityFixture(
+      "openclaw-bootstrap-setup-profile-",
+    );
+
+    try {
+      const issued = await issueDeviceBootstrapToken();
+      const wsOperator = await openWs(port, REMOTE_BOOTSTRAP_HEADERS);
+      const initial = await connectReq(wsOperator, {
+        skipDefaultAuth: true,
+        bootstrapToken: issued.token,
+        role: "operator",
+        scopes: ["operator.read"],
+        client,
+        deviceIdentityPath: identityPath,
+      });
+      expect(initial.ok).toBe(false);
+      expect(initial.error?.message ?? "").toContain("pairing required");
+      expect((initial.error?.details as { code?: string } | undefined)?.code).toBe(
+        ConnectErrorDetailCodes.PAIRING_REQUIRED,
+      );
+
+      const pendingForDevice = (await listDevicePairing()).pending.filter(
+        (entry) => entry.deviceId === identity.deviceId,
+      );
+      expect(pendingForDevice).toHaveLength(1);
+      expect(pendingForDevice[0]?.roles).toEqual(expect.arrayContaining(["node", "operator"]));
+      expect(pendingForDevice[0]?.scopes ?? []).toEqual(
+        expect.arrayContaining(["operator.read", "operator.write", "operator.talk.secrets"]),
+      );
+      if (!pendingForDevice[0]) {
+        throw new Error("expected pending pairing request");
+      }
+
+      await approveDevicePairing(pendingForDevice[0].requestId, {
+        callerScopes: pendingForDevice[0].scopes ?? ["operator.admin"],
+      });
+
+      const paired = await getPairedDevice(identity.deviceId);
+      expect(paired?.roles).toEqual(expect.arrayContaining(["node", "operator"]));
+      expect(paired?.approvedScopes).toEqual(
+        expect.arrayContaining(["operator.read", "operator.write", "operator.talk.secrets"]),
+      );
+
+      wsOperator.close();
+
+      const wsNode = await openWs(port, REMOTE_BOOTSTRAP_HEADERS);
+      const nodeConnect = await connectReq(wsNode, {
+        skipDefaultAuth: true,
+        bootstrapToken: issued.token,
+        role: "node",
+        scopes: [],
+        client: {
+          ...client,
+          mode: "node",
+        },
+        deviceIdentityPath: identityPath,
+      });
+      expect(nodeConnect.ok).toBe(true);
+      wsNode.close();
+
+      const pendingAfterApproval = await listDevicePairing();
+      expect(
+        pendingAfterApproval.pending.filter((entry) => entry.deviceId === identity.deviceId),
+      ).toEqual([]);
+    } finally {
+      await server.close();
+      restoreGatewayToken(prevToken);
+    }
+  });
+
   test("merges remote node/operator pairing requests for the same unpaired device", async () => {
     const { approveDevicePairing, getPairedDevice, listDevicePairing } =
       await import("../infra/device-pairing.js");

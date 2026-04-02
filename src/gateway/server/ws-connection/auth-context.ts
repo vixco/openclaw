@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "node:http";
+import type { DeviceBootstrapProfile } from "../../../shared/device-bootstrap-profile.js";
 import {
   AUTH_RATE_LIMIT_SCOPE_DEVICE_TOKEN,
   AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET,
@@ -32,12 +33,15 @@ export type ConnectAuthState = {
 };
 
 type VerifyDeviceTokenResult = { ok: boolean };
-type VerifyBootstrapTokenResult = { ok: boolean; reason?: string };
+type VerifyBootstrapTokenResult =
+  | { ok: true; allowedProfile: DeviceBootstrapProfile }
+  | { ok: false; reason?: string };
 
 export type ConnectAuthDecision = {
   authResult: GatewayAuthResult;
   authOk: boolean;
   authMethod: GatewayAuthResult["method"];
+  bootstrapProfile?: DeviceBootstrapProfile;
 };
 
 function trimToUndefined(value: string | undefined): string | undefined {
@@ -168,6 +172,7 @@ export async function resolveConnectAuthDecision(params: {
   let authResult = params.state.authResult;
   let authOk = params.state.authOk;
   let authMethod = params.state.authMethod;
+  let bootstrapProfile: DeviceBootstrapProfile | undefined;
 
   const bootstrapTokenCandidate = params.state.bootstrapTokenCandidate;
   if (params.hasDeviceIdentity && params.deviceId && params.publicKey && bootstrapTokenCandidate) {
@@ -186,6 +191,7 @@ export async function resolveConnectAuthDecision(params: {
       // token can be revoked after approval.
       authOk = true;
       authMethod = "bootstrap-token";
+      bootstrapProfile = tokenCheck.allowedProfile;
     } else if (!authOk) {
       authResult = { ok: false, reason: tokenCheck.reason ?? "bootstrap_token_invalid" };
     }
@@ -193,7 +199,7 @@ export async function resolveConnectAuthDecision(params: {
 
   const deviceTokenCandidate = params.state.deviceTokenCandidate;
   if (!params.hasDeviceIdentity || !params.deviceId || authOk || !deviceTokenCandidate) {
-    return { authResult, authOk, authMethod };
+    return { authResult, authOk, authMethod, bootstrapProfile };
   }
 
   if (params.rateLimiter) {
@@ -236,5 +242,5 @@ export async function resolveConnectAuthDecision(params: {
     }
   }
 
-  return { authResult, authOk, authMethod };
+  return { authResult, authOk, authMethod, bootstrapProfile };
 }

@@ -29,6 +29,10 @@ export type DeviceBootstrapTokenRecord = {
   lastUsedAtMs?: number;
 };
 
+export type VerifyDeviceBootstrapTokenResult =
+  | { ok: true; allowedProfile: DeviceBootstrapProfile }
+  | { ok: false; reason: string };
+
 type DeviceBootstrapStateFile = Record<string, DeviceBootstrapTokenRecord>;
 
 const withLock = createAsyncLock();
@@ -176,7 +180,7 @@ export async function verifyDeviceBootstrapToken(params: {
   role: string;
   scopes: readonly string[];
   baseDir?: string;
-}): Promise<{ ok: true } | { ok: false; reason: string }> {
+}): Promise<VerifyDeviceBootstrapTokenResult> {
   return await withLock(async () => {
     const state = await loadState(params.baseDir);
     const providedToken = params.token.trim();
@@ -225,7 +229,7 @@ export async function verifyDeviceBootstrapToken(params: {
         lastUsedAtMs: Date.now(),
       };
       await persistState(state, params.baseDir);
-      return { ok: true };
+      return { ok: true, allowedProfile };
     }
 
     state[tokenKey] = {
@@ -236,6 +240,6 @@ export async function verifyDeviceBootstrapToken(params: {
       lastUsedAtMs: Date.now(),
     };
     await persistState(state, params.baseDir);
-    return { ok: true };
+    return { ok: true, allowedProfile };
   });
 }

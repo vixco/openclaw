@@ -31,6 +31,7 @@ import { upsertPresence } from "../../../infra/system-presence.js";
 import { loadVoiceWakeConfig } from "../../../infra/voicewake.js";
 import { rawDataToString } from "../../../infra/ws.js";
 import type { createSubsystemLogger } from "../../../logging/subsystem.js";
+import type { DeviceBootstrapProfile } from "../../../shared/device-bootstrap-profile.js";
 import { roleScopesAllow } from "../../../shared/operator-scope-compat.js";
 import {
   isBrowserOperatorUiClient,
@@ -663,7 +664,8 @@ export function attachGatewayWsMessageHandler(params: {
           }
         }
 
-        ({ authResult, authOk, authMethod } = await resolveConnectAuthDecision({
+        let bootstrapProfile: DeviceBootstrapProfile | undefined;
+        ({ authResult, authOk, authMethod, bootstrapProfile } = await resolveConnectAuthDecision({
           state: {
             authResult,
             authOk,
@@ -742,6 +744,7 @@ export function attachGatewayWsMessageHandler(params: {
             clientId: connectParams.client.id,
             clientMode: connectParams.client.mode,
             role,
+            roles: [role],
             scopes,
             remoteIp: reportedClientIp,
           };
@@ -799,10 +802,19 @@ export function attachGatewayWsMessageHandler(params: {
               role === "node" &&
               scopes.length === 0 &&
               !existingPairedDevice;
+            const pairingRequestMetadata =
+              authMethod === "bootstrap-token" && bootstrapProfile && !allowSilentBootstrapPairing
+                ? {
+                    ...clientPairingMetadata,
+                    role: bootstrapProfile.roles[0] ?? role,
+                    roles: bootstrapProfile.roles,
+                    scopes: bootstrapProfile.scopes,
+                  }
+                : clientPairingMetadata;
             const pairing = await requestDevicePairing({
               deviceId: device.id,
               publicKey: devicePublicKey,
-              ...clientPairingMetadata,
+              ...pairingRequestMetadata,
               silent:
                 reason === "scope-upgrade"
                   ? false
