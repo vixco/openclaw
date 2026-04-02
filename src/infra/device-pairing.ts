@@ -521,6 +521,7 @@ export async function approveDevicePairing(
     const now = Date.now();
     const existing = state.pairedByDeviceId[pending.deviceId];
     const roles = mergeRoles(existing?.roles, existing?.role, pending.roles, pending.role);
+    const requestedRoles = new Set(resolveRequestedRoles(pending));
     const approvedScopes = mergeScopes(
       existing?.approvedScopes ?? existing?.scopes,
       pending.scopes,
@@ -528,6 +529,9 @@ export async function approveDevicePairing(
     const tokens = existing?.tokens ? { ...existing.tokens } : {};
     for (const roleForToken of roles ?? []) {
       const existingToken = tokens[roleForToken];
+      if (!requestedRoles.has(roleForToken)) {
+        continue;
+      }
       const requestedScopes = resolveRequestedDeviceTokenScopes(roleForToken, pending.scopes);
       const nextScopes =
         requestedScopes.length > 0

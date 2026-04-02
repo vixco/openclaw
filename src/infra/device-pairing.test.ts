@@ -397,6 +397,54 @@ describe("device pairing tokens", () => {
     ]);
   });
 
+  test("does not rotate unrelated role tokens when re-approving another role", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "openclaw-device-pairing-"));
+    await requestDevicePairing(
+      {
+        deviceId: "device-1",
+        publicKey: "public-key-1",
+        role: "node",
+        scopes: [],
+      },
+      baseDir,
+    );
+    const initial = await requestDevicePairing(
+      {
+        deviceId: "device-1",
+        publicKey: "public-key-1",
+        role: "operator",
+        scopes: ["operator.write"],
+      },
+      baseDir,
+    );
+    await approveDevicePairing(
+      initial.request.requestId,
+      { callerScopes: ["operator.write"] },
+      baseDir,
+    );
+    const before = await getPairedDevice("device-1", baseDir);
+    const nodeToken = requireToken(before?.tokens?.node?.token);
+
+    const repair = await requestDevicePairing(
+      {
+        deviceId: "device-1",
+        publicKey: "public-key-1",
+        role: "operator",
+        scopes: ["operator.write"],
+      },
+      baseDir,
+    );
+    await approveDevicePairing(
+      repair.request.requestId,
+      { callerScopes: ["operator.write"] },
+      baseDir,
+    );
+
+    const after = await getPairedDevice("device-1", baseDir);
+    expect(after?.tokens?.node?.token).toBe(nodeToken);
+    expect(after?.tokens?.operator?.token).not.toBe(before?.tokens?.operator?.token);
+  });
+
   test("rejects scope escalation when rotating a token and leaves state unchanged", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "openclaw-device-pairing-"));
     await setupPairedOperatorDevice(baseDir, ["operator.read"]);

@@ -54,7 +54,11 @@ export async function reconcileNodePairingOnConnect(params: {
   reportedClientIp?: string;
   allowImplicitPairing: boolean;
   requestPairing: (input: NodePairingRequestInput) => Promise<PendingNodePairingResult>;
-  approvePairing: (requestId: string) => Promise<ApprovedNodePairingResult | null>;
+  approvePairing: (
+    requestId: string,
+    callerScopes: readonly string[],
+  ) => Promise<ApprovedNodePairingResult | null>;
+  implicitPairingCallerScopes: readonly string[];
 }): Promise<NodeConnectPairingReconcileResult> {
   const nodeId = params.connectParams.device?.id ?? params.connectParams.client.id;
   const allowlist = resolveNodeCommandAllowlist(params.cfg, {
@@ -78,7 +82,10 @@ export async function reconcileNodePairingOnConnect(params: {
       }),
     );
     if (params.allowImplicitPairing) {
-      const approvedPairing = await params.approvePairing(pendingPairing.request.requestId);
+      const approvedPairing = await params.approvePairing(
+        pendingPairing.request.requestId,
+        params.implicitPairingCallerScopes,
+      );
       if (approvedPairing) {
         return {
           nodeId,

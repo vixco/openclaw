@@ -1007,16 +1007,22 @@ export function attachGatewayWsMessageHandler(params: {
           : null;
 
         if (role === "node") {
+          const implicitPairingCallerScopes =
+            pairedDeviceForConnect?.approvedScopes ?? pairedDeviceForConnect?.scopes ?? [];
           const reconciliation = await reconcileNodePairingOnConnect({
             cfg: loadConfig(),
             connectParams,
             pairedNode: await getPairedNode(connectParams.device?.id ?? connectParams.client.id),
             reportedClientIp,
             requestPairing: async (input) => await requestNodePairing(input),
-            approvePairing: async (requestId) => await approveNodePairing(requestId),
+            approvePairing: async (requestId, callerScopes) => {
+              const approved = await approveNodePairing(requestId, { callerScopes });
+              return approved && "node" in approved ? approved : null;
+            },
             allowImplicitPairing:
               pairedDeviceForConnect !== null &&
               hasEffectivePairedDeviceRole(pairedDeviceForConnect, "node"),
+            implicitPairingCallerScopes,
           });
           if (reconciliation.pendingPairing?.created) {
             const requestContext = buildRequestContext();
