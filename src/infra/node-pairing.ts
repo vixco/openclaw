@@ -215,7 +215,6 @@ export async function requestNodePairing(
             ),
           },
         }),
-      shouldReuseReplacementRequestId: () => true,
       persist: async () => await persistState(state, baseDir),
     });
   });

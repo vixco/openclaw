@@ -466,8 +466,6 @@ export async function requestDevicePairing(
           },
         });
       },
-      shouldReuseReplacementRequestId: ({ existing, incoming }) =>
-        existing.every((pending) => pending.publicKey === incoming.publicKey),
       persist: async () => await persistState(state, baseDir),
     });
   });
