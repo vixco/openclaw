@@ -160,6 +160,26 @@ describe("discordOutbound", () => {
     });
   });
 
+  it("neutralizes mentions for webhook thread text replies", async () => {
+    mockDiscordBoundThreadManager(hoisted);
+
+    await discordOutbound.sendText?.({
+      cfg: {},
+      to: "channel:parent-1",
+      text: "Hello @everyone <@123>",
+      accountId: "default",
+      threadId: "thread-1",
+    });
+
+    expect(hoisted.sendWebhookMessageDiscordMock).toHaveBeenCalledWith(
+      "Hello @\u200beveryone <@\u200b123>",
+      expect.objectContaining({
+        webhookId: "wh-1",
+        webhookToken: "tok-1",
+      }),
+    );
+  });
+
   it("routes poll sends to thread target when threadId is provided", async () => {
     const result = await discordOutbound.sendPoll?.({
       cfg: {},
@@ -241,7 +261,7 @@ describe("discordOutbound", () => {
     });
   });
 
-  it("neutralizes approval mentions only for approval payloads", async () => {
+  it("neutralizes approval mentions in payload sends", async () => {
     await discordOutbound.sendPayload?.({
       cfg: {},
       to: "channel:123456",
@@ -267,7 +287,7 @@ describe("discordOutbound", () => {
     );
   });
 
-  it("leaves non-approval mentions unchanged", async () => {
+  it("neutralizes non-approval mentions in payload sends", async () => {
     await discordOutbound.sendPayload?.({
       cfg: {},
       to: "channel:123456",
@@ -280,7 +300,7 @@ describe("discordOutbound", () => {
 
     expect(hoisted.sendMessageDiscordMock).toHaveBeenCalledWith(
       "channel:123456",
-      "Hello @everyone",
+      "Hello @\u200beveryone",
       expect.objectContaining({
         accountId: "default",
       }),
