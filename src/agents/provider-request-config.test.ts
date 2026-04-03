@@ -93,7 +93,7 @@ describe("provider request config", () => {
         },
         proxy: {
           mode: "explicit-proxy",
-          url: "http://proxy.internal:8443",
+          url: "http://proxy.example.com:8443",
           tls: {
             ca: "proxy-ca",
           },
@@ -125,7 +125,7 @@ describe("provider request config", () => {
     expect(resolved.proxy).toEqual({
       configured: true,
       mode: "explicit-proxy",
-      proxyUrl: "http://proxy.internal:8443",
+      proxyUrl: "http://proxy.example.com:8443",
       tls: {
         configured: true,
         ca: "proxy-ca",
@@ -259,7 +259,7 @@ describe("provider request config", () => {
         },
         proxy: {
           mode: "explicit-proxy",
-          url: "http://proxy.internal:8443",
+          url: "http://proxy.example.com:8443",
           tls: {
             ca: "proxy-ca",
           },
@@ -280,7 +280,7 @@ describe("provider request config", () => {
       },
       proxy: {
         mode: "explicit-proxy",
-        url: "http://proxy.internal:8443",
+        url: "http://proxy.example.com:8443",
         tls: {
           ca: "proxy-ca",
         },
@@ -318,7 +318,7 @@ describe("provider request config", () => {
         },
         proxy: {
           mode: "explicit-proxy",
-          url: "http://proxy.internal:8443",
+          url: "http://proxy.example.com:8443",
         },
       }),
     ).toEqual({
@@ -327,9 +327,20 @@ describe("provider request config", () => {
       },
       proxy: {
         mode: "explicit-proxy",
-        url: "http://proxy.internal:8443",
+        url: "http://proxy.example.com:8443",
       },
     });
+  });
+
+  it("rejects configured explicit proxies that target blocked internal hosts", () => {
+    expect(() =>
+      sanitizeConfiguredProviderRequest({
+        proxy: {
+          mode: "explicit-proxy",
+          url: "http://169.254.169.254:8080",
+        },
+      }),
+    ).toThrow(/request\.proxy\.url must not target private or internal hosts/i);
   });
 
   it("merges configured request overrides with later entries winning", () => {
