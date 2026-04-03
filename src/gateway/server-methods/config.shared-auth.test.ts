@@ -55,7 +55,7 @@ beforeEach(() => {
 });
 
 describe("config shared auth disconnects", () => {
-  it("does not disconnect shared-auth clients for config.set auth writes without restart", async () => {
+  it("disconnects shared-auth clients for config.set auth writes without restart", async () => {
     const prevConfig: OpenClawConfig = {
       gateway: {
         auth: {
@@ -86,7 +86,7 @@ describe("config shared auth disconnects", () => {
     await flushConfigHandlerMicrotasks();
 
     expect(writeConfigFileMock).toHaveBeenCalledWith(nextConfig, {});
-    expect(disconnectClientsUsingSharedGatewayAuth).not.toHaveBeenCalled();
+    expect(disconnectClientsUsingSharedGatewayAuth).toHaveBeenCalledTimes(1);
     expect(scheduleGatewaySigusr1RestartMock).not.toHaveBeenCalled();
   });
 
