@@ -776,7 +776,7 @@ describe("model-selection", () => {
           model: "\u001B[31mclaude-3-5-sonnet\nspoof",
         });
         const warning = warnSpy.mock.calls[0]?.[0] as string;
-        expect(warning).toContain('Falling back to "google/claude-3-5-sonnet"');
+        expect(warning).toContain('Falling back to "google/claude-3-5-sonnetspoof"');
         expect(warning).not.toContain("\u001B");
         expect(warning).not.toContain("\n");
       } finally {

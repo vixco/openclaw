@@ -467,6 +467,7 @@ describe("config io write", () => {
           gateway: { port: 18789 },
           channels: {
             bluebubbles: {
+              password: "test-password",
               serverUrl: "http://localhost:1234",
             },
           },
@@ -501,6 +502,7 @@ describe("config io write", () => {
       const channels = persisted.channels as Record<string, Record<string, unknown>> | undefined;
       expect(channels?.bluebubbles).toBeDefined();
       expect(channels?.bluebubbles).not.toHaveProperty("enrichGroupParticipantsFromContacts");
+      expect(channels?.bluebubbles?.password).toBe("test-password");
       expect(channels?.bluebubbles?.serverUrl).toBe("http://localhost:1234");
     });
 
