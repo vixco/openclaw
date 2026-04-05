@@ -9,6 +9,7 @@ import {
   pickPrimaryTailnetIPv4Mock as pickPrimaryTailnetIPv4,
   resolveGatewayPortMock as resolveGatewayPort,
 } from "./gateway-connection.test-mocks.js";
+import { CLI_DEFAULT_OPERATOR_SCOPES } from "./method-scopes.js";
 
 const deviceIdentityState = vi.hoisted(() => ({
   value: {
@@ -402,13 +403,7 @@ describe("callGateway url resolution", () => {
     {
       label: "keeps legacy admin scopes for explicit CLI callers",
       call: () => callGatewayCli({ method: "health" }),
-      expectedScopes: [
-        "operator.admin",
-        "operator.read",
-        "operator.write",
-        "operator.approvals",
-        "operator.pairing",
-      ],
+      expectedScopes: CLI_DEFAULT_OPERATOR_SCOPES,
     },
   ])("scope selection: $label", async ({ call, expectedScopes }) => {
     setLocalLoopbackGatewayConfig();

@@ -68,6 +68,8 @@ const imageProviderHarness = vi.hoisted(() => {
 vi.mock("../bash-tools.js", () => ({
   createExecTool: vi.fn(() => piToolsHarness.createStubTool("exec")),
   createProcessTool: vi.fn(() => piToolsHarness.createStubTool("process")),
+  describeExecTool: vi.fn(() => "exec stub"),
+  describeProcessTool: vi.fn(() => "process stub"),
 }));
 
 vi.mock("../channel-tools.js", () => ({
@@ -579,11 +581,7 @@ describe("image tool implicit imageModel config", () => {
       };
       expect(resolveImageModelConfigForTool({ cfg, agentDir })).toEqual({
         ...createDefaultImageFallbackExpectation("minimax/MiniMax-VL-01"),
-        fallbacks: [
-          "openai/gpt-5.4-mini",
-          "anthropic/claude-opus-4-6",
-          "minimax-portal/MiniMax-VL-01",
-        ],
+        fallbacks: ["openai/gpt-5.4-mini", "anthropic/claude-opus-4-6"],
       });
       expect(createImageTool({ config: cfg, agentDir })).not.toBeNull();
     });

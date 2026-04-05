@@ -65,9 +65,8 @@ function findExtensionImports(source: string): string[] {
 }
 
 function isAllowedExtensionPublicImport(specifier: string): boolean {
-  return /(?:^|\/)extensions\/[^/]+\/(?:api|index|runtime-api|setup-entry|login-qr-api)\.js$/u.test(
-    specifier,
-  );
+  const basename = getImportBasename(specifier).replace(/\.(?:[cm]?ts|tsx)$/u, ".js");
+  return ALLOWED_EXTENSION_PUBLIC_SURFACE_BASENAMES.has(basename);
 }
 
 function findPluginSdkImports(source: string): string[] {

@@ -95,6 +95,27 @@ function findSafeNewlineBreakIndex(params: {
   return -1;
 }
 
+function findFenceCloseLineStartRelative(
+  buffer: string,
+  fence: FenceSpan,
+  offset = 0,
+): number | undefined {
+  const searchEnd = Math.min(buffer.length, Math.max(0, fence.end - offset));
+  const closeLineToken = `\n${fence.indent}${fence.marker}`;
+  const closeLineWithLeadingNewlineIdx = buffer.lastIndexOf(closeLineToken, searchEnd);
+  if (closeLineWithLeadingNewlineIdx !== -1) {
+    return closeLineWithLeadingNewlineIdx + 1;
+  }
+
+  // Handle the degenerate case where the current buffer starts on the close fence line.
+  const closeLineStart = Math.max(0, fence.start - offset);
+  if (buffer.startsWith(`${fence.indent}${fence.marker}`, closeLineStart)) {
+    return closeLineStart;
+  }
+
+  return undefined;
+}
+
 export class EmbeddedBlockChunker {
   #buffer = "";
   readonly #chunking: BlockReplyChunking;
@@ -363,6 +384,10 @@ export class EmbeddedBlockChunker {
       }
       const fence = findFenceSpanAt(fenceSpans, offset + maxChars);
       if (fence) {
+        const closeLineStart = findFenceCloseLineStartRelative(buffer, fence, offset);
+        if (closeLineStart !== undefined && maxChars >= closeLineStart) {
+          return { index: Math.min(buffer.length, Math.max(closeLineStart, fence.end - offset)) };
+        }
         return {
           index: maxChars,
           fenceSplit: {

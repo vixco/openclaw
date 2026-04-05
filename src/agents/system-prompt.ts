@@ -180,10 +180,19 @@ function buildDocsSection(params: { docsPath?: string; isMinimal: boolean; readT
   ];
 }
 
-function buildExecApprovalPromptGuidance(params: { runtimeChannel?: string }) {
+function buildExecApprovalPromptGuidance(params: {
+  runtimeChannel?: string;
+  runtimeCapabilities?: readonly string[];
+}) {
   const runtimeChannel = params.runtimeChannel?.trim().toLowerCase();
+  const runtimeCapabilitiesLower = new Set(
+    (params.runtimeCapabilities ?? [])
+      .map((cap) => String(cap).trim().toLowerCase())
+      .filter(Boolean),
+  );
   const usesNativeApprovalUi =
     runtimeChannel === "webchat" ||
+    runtimeCapabilitiesLower.has("inlinebuttons") ||
     (runtimeChannel
       ? Boolean(resolveChannelApprovalCapability(getChannelPlugin(runtimeChannel))?.native)
       : false);
@@ -504,6 +513,7 @@ export function buildAgentSystemPrompt(params: {
     "When a first-class tool exists for an action, use the tool directly instead of asking the user to run equivalent CLI or slash commands.",
     buildExecApprovalPromptGuidance({
       runtimeChannel: params.runtimeInfo?.channel,
+      runtimeCapabilities: params.runtimeInfo?.capabilities,
     }),
     "Never execute /approve through exec or any other shell/tool path; /approve is a user-facing approval command, not a shell command.",
     "Treat allow-once as single-command only: if another elevated command needs approval, request a fresh /approve and do not claim prior approval covered it.",

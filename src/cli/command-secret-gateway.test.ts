@@ -471,8 +471,8 @@ describe("resolveCommandSecretRefsViaGateway", () => {
     callGateway.mockResolvedValueOnce({
       assignments: [
         {
-          path: "talk.providers.elevenlabs.apiKey",
-          pathSegments: ["talk", "providers", "elevenlabs", "apiKey"],
+          path: "talk.providers.elevenlabs.apiKey.value",
+          pathSegments: ["talk", "providers", "elevenlabs", "apiKey", "value"],
           value: "sk-live",
         },
       ],

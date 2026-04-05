@@ -142,4 +142,23 @@ describe("EmbeddedBlockChunker", () => {
     expect(parseSpy).toHaveBeenCalledTimes(1);
     parseSpy.mockRestore();
   });
+
+  it("finishes a closing fence instead of splitting inside the fence marker", () => {
+    const chunker = new EmbeddedBlockChunker({
+      minChars: 10,
+      maxChars: 30,
+      breakPreference: "paragraph",
+    });
+
+    chunker.append(`\`\`\`txt\n${"a".repeat(80)}\n\`\`\``);
+
+    const chunks = drainChunks(chunker);
+
+    expect(chunks).toEqual([
+      `\`\`\`txt\n${"a".repeat(23)}\n\`\`\`\n`,
+      `\`\`\`txt\n${"a".repeat(30)}\n\`\`\`\n`,
+      `\`\`\`txt\n${"a".repeat(27)}\n\`\`\``,
+    ]);
+    expect(chunker.bufferedText).toBe("");
+  });
 });

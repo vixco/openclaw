@@ -182,11 +182,13 @@ function getFacadeBoundaryResolvedConfig() {
 
 function resolveBundledPluginManifestRecordByDirName(dirName: string): PluginManifestRecord | null {
   const { config } = getFacadeBoundaryResolvedConfig();
+  const registry = loadPluginManifestRegistry({
+    config,
+    cache: true,
+  });
+  const plugins = Array.isArray(registry?.plugins) ? registry.plugins : [];
   return (
-    loadPluginManifestRegistry({
-      config,
-      cache: true,
-    }).plugins.find(
+    plugins.find(
       (plugin) => plugin.origin === "bundled" && path.basename(plugin.rootDir) === dirName,
     ) ?? null
   );

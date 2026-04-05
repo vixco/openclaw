@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
+import { clearPluginDiscoveryCache } from "../plugins/discovery.js";
+import { clearPluginLoaderCache } from "../plugins/loader.js";
+import { clearPluginManifestRegistryCache } from "../plugins/manifest-registry.js";
+import { resetPluginRuntimeStateForTest } from "../plugins/runtime.js";
 import { createOpenClawCodingTools } from "./pi-tools.js";
 import { resolveSandboxConfigForAgent } from "./sandbox/config.js";
 import { createHostSandboxFsBridge } from "./test-helpers/host-sandbox-fs-bridge.js";
@@ -32,6 +36,13 @@ function listToolNames(params: {
 }
 
 describe("pi-tools sandbox policy", () => {
+  beforeEach(() => {
+    clearPluginLoaderCache();
+    clearPluginDiscoveryCache();
+    clearPluginManifestRegistryCache();
+    resetPluginRuntimeStateForTest();
+  });
+
   it("re-exposes omitted sandbox tools via sandbox alsoAllow", () => {
     const names = listToolNames({
       cfg: {
@@ -68,6 +79,9 @@ describe("pi-tools sandbox policy", () => {
           },
           list: [{ id: "tavern" }],
         },
+        plugins: {
+          allow: ["browser"],
+        },
         tools: {
           sandbox: {
             tools: {
@@ -102,6 +116,9 @@ describe("pi-tools sandbox policy", () => {
           },
         ],
       },
+      plugins: {
+        allow: ["browser"],
+      },
     } as OpenClawConfig;
 
     const names = listToolNames({
@@ -122,6 +139,9 @@ describe("pi-tools sandbox policy", () => {
             sandbox: { mode: "all", scope: "agent" },
           },
           list: [{ id: "tavern" }],
+        },
+        plugins: {
+          allow: ["browser"],
         },
         tools: {
           sandbox: {

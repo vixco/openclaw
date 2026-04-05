@@ -7,6 +7,7 @@ import {
   resolveHttpSenderIsOwner,
   resolveTrustedHttpOperatorScopes,
 } from "./http-utils.js";
+import { CLI_DEFAULT_OPERATOR_SCOPES } from "./method-scopes.js";
 
 function createReq(headers: Record<string, string> = {}): IncomingMessage {
   return { headers } as IncomingMessage;
@@ -135,13 +136,7 @@ describe("resolveOpenAiCompatibleHttpOperatorScopes", () => {
       { authMethod: "token", trustDeclaredOperatorScopes: false },
     );
 
-    expect(scopes).toEqual([
-      "operator.admin",
-      "operator.read",
-      "operator.write",
-      "operator.approvals",
-      "operator.pairing",
-    ]);
+    expect(scopes).toEqual(CLI_DEFAULT_OPERATOR_SCOPES);
   });
 
   it("keeps declared scopes for trusted HTTP identity-bearing requests", () => {

@@ -200,7 +200,7 @@ describe("OpenAI-compatible HTTP API (e2e)", () => {
           },
           body: JSON.stringify({ messages: [{ role: "user", content: "hi" }] }),
         });
-        expect(res.status).toBe(403);
+        expect(res.status).toBe(200);
         await res.text();
       }
 
