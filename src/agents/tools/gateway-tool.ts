@@ -85,8 +85,25 @@ function getValueAtPath(config: Record<string, unknown>, path: string): unknown 
   return getValueAtCanonicalPath(config, path.replace(/^tools\.exec\./, "tools.bash."));
 }
 
-function normalizeDangerousConfigFlag(flag: string): string {
-  return flag.replace(/\[\d+\]/g, "[]");
+// Normalize a dangerous flag path using the mapping's id field (if present) so that
+// reordering an existing dangerous mapping does not look like a newly enabled flag,
+// while still detecting when a new mapping identity gains a dangerous flag.
+function normalizeDangerousConfigFlag(flag: string, config: Record<string, unknown>): string {
+  return flag.replace(/^(hooks\.mappings)\[(\d+)\]/, (_, prefix: string, indexStr: string) => {
+    const index = parseInt(indexStr, 10);
+    const mappings = (config as { hooks?: { mappings?: unknown[] } }).hooks?.mappings;
+    if (!Array.isArray(mappings)) {
+      return `${prefix}[${indexStr}]`;
+    }
+    const mapping = mappings[index];
+    if (mapping && typeof mapping === "object") {
+      const id = (mapping as Record<string, unknown>).id;
+      if (typeof id === "string") {
+        return `${prefix}[id=${id}]`;
+      }
+    }
+    return `${prefix}[${indexStr}]`;
+  });
 }
 
 function collectNewlyEnabledDangerousConfigFlags(
@@ -95,13 +112,22 @@ function collectNewlyEnabledDangerousConfigFlags(
 ): string[] {
   const currentFlagCounts = new Map<string, number>();
   for (const flag of collectEnabledInsecureOrDangerousFlags(currentConfig as OpenClawConfig)) {
-    const normalizedFlag = normalizeDangerousConfigFlag(flag);
+    const normalizedFlag = normalizeDangerousConfigFlag(flag, currentConfig);
     currentFlagCounts.set(normalizedFlag, (currentFlagCounts.get(normalizedFlag) ?? 0) + 1);
+  }
+  // Honor the legacy tools.bash.applyPatch.workspaceOnly alias in the baseline so that
+  // canonicalizing an already-dangerous legacy config to tools.exec.* is not treated as
+  // a newly enabled dangerous flag.
+  if (getValueAtPath(currentConfig, "tools.exec.applyPatch.workspaceOnly") === false) {
+    const key = "tools.exec.applyPatch.workspaceOnly=false";
+    if (!currentFlagCounts.has(key)) {
+      currentFlagCounts.set(key, 1);
+    }
   }
   const seenNextFlagCounts = new Map<string, number>();
   const nextFlags = collectEnabledInsecureOrDangerousFlags(nextConfig as OpenClawConfig).filter(
     (flag) => {
-      const normalizedFlag = normalizeDangerousConfigFlag(flag);
+      const normalizedFlag = normalizeDangerousConfigFlag(flag, nextConfig);
       const nextCount = (seenNextFlagCounts.get(normalizedFlag) ?? 0) + 1;
       seenNextFlagCounts.set(normalizedFlag, nextCount);
       return nextCount > (currentFlagCounts.get(normalizedFlag) ?? 0);
