@@ -85,15 +85,27 @@ function getValueAtPath(config: Record<string, unknown>, path: string): unknown 
   return getValueAtCanonicalPath(config, path.replace(/^tools\.exec\./, "tools.bash."));
 }
 
+function normalizeDangerousConfigFlag(flag: string): string {
+  return flag.replace(/\[\d+\]/g, "[]");
+}
+
 function collectNewlyEnabledDangerousConfigFlags(
   currentConfig: Record<string, unknown>,
   nextConfig: Record<string, unknown>,
 ): string[] {
-  const currentFlags = new Set(
-    collectEnabledInsecureOrDangerousFlags(currentConfig as OpenClawConfig),
-  );
+  const currentFlagCounts = new Map<string, number>();
+  for (const flag of collectEnabledInsecureOrDangerousFlags(currentConfig as OpenClawConfig)) {
+    const normalizedFlag = normalizeDangerousConfigFlag(flag);
+    currentFlagCounts.set(normalizedFlag, (currentFlagCounts.get(normalizedFlag) ?? 0) + 1);
+  }
+  const seenNextFlagCounts = new Map<string, number>();
   const nextFlags = collectEnabledInsecureOrDangerousFlags(nextConfig as OpenClawConfig).filter(
-    (flag) => !currentFlags.has(flag),
+    (flag) => {
+      const normalizedFlag = normalizeDangerousConfigFlag(flag);
+      const nextCount = (seenNextFlagCounts.get(normalizedFlag) ?? 0) + 1;
+      seenNextFlagCounts.set(normalizedFlag, nextCount);
+      return nextCount > (currentFlagCounts.get(normalizedFlag) ?? 0);
+    },
   );
   if (
     getValueAtPath(currentConfig, "tools.exec.applyPatch.workspaceOnly") !== false &&
