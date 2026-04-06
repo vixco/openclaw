@@ -210,7 +210,6 @@ function collectNewlyEnabledDangerousConfigFlags(
 
 function assertGatewayConfigMutationAllowed(params: {
   action: "config.apply" | "config.patch";
-  config?: OpenClawConfig;
   currentConfig: Record<string, unknown>;
   gatewayUrl?: string;
   raw: string;
@@ -230,9 +229,9 @@ function assertGatewayConfigMutationAllowed(params: {
       `gateway ${params.action} cannot change protected config paths: ${changedProtectedPaths.join(", ")}`,
     );
   }
+  // Load config fresh (not captured opts.config) so gateway.mode changes during a session are seen.
   if (
     isRemoteGatewayTargetForAgentTools({
-      config: params.config,
       gatewayUrl: params.gatewayUrl,
     }) &&
     !isDeepStrictEqual(
@@ -416,7 +415,6 @@ export function createGatewayTool(opts?: {
           await resolveConfigWriteParams();
         assertGatewayConfigMutationAllowed({
           action: "config.apply",
-          config: opts?.config,
           currentConfig: snapshotConfig,
           gatewayUrl: gatewayOpts.gatewayUrl,
           raw,
@@ -435,7 +433,6 @@ export function createGatewayTool(opts?: {
           await resolveConfigWriteParams();
         assertGatewayConfigMutationAllowed({
           action: "config.patch",
-          config: opts?.config,
           currentConfig: snapshotConfig,
           gatewayUrl: gatewayOpts.gatewayUrl,
           raw,
