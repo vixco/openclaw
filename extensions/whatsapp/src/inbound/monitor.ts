@@ -7,8 +7,7 @@ import { getChildLogger } from "openclaw/plugin-sdk/text-runtime";
 import { readWebSelfIdentity } from "../auth-store.js";
 import { getPrimaryIdentityId, resolveComparableIdentity } from "../identity.js";
 import { DEFAULT_RECONNECT_POLICY, computeBackoff, sleepWithAbort } from "../reconnect.js";
-import { createWaSocket, getStatusCode, waitForWaConnection } from "../session.js";
-import { formatError } from "../session.js";
+import { createWaSocket, formatError, getStatusCode, waitForWaConnection } from "../session.js";
 import { resolveJidToE164 } from "../text-runtime.js";
 import { checkInboundAccessControl } from "./access-control.js";
 import {
@@ -38,6 +37,10 @@ function isGroupJid(jid: string): boolean {
 
 function isRetryableSendDisconnectError(err: unknown): boolean {
   return /closed|reset|timed\s*out|disconnect|no active socket/i.test(formatError(err));
+}
+
+function shouldClearSocketRefAfterSendFailure(err: unknown): boolean {
+  return /closed|reset|disconnect|no active socket/i.test(formatError(err));
 }
 
 export async function monitorWebInbox(options: {
@@ -200,7 +203,10 @@ export async function monitorWebInbox(options: {
             throw err;
           }
           lastErr = err;
-          if (options.socketRef?.current === currentSock) {
+          if (
+            shouldClearSocketRefAfterSendFailure(err) &&
+            options.socketRef?.current === currentSock
+          ) {
             options.socketRef.current = null;
           }
         }

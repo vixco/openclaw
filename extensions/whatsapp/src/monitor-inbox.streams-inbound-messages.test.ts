@@ -312,6 +312,58 @@ describe("web monitor inbox", () => {
     await listener.close();
   });
 
+  it("retries timed-out sends on the same socket without clearing the socket ref", async () => {
+    const onMessage = vi.fn(async () => undefined);
+    const socketRef: NonNullable<InboxMonitorOptions["socketRef"]> = { current: null };
+
+    const { listener, sock } = await startInboxMonitor(onMessage as InboxOnMessage, {
+      socketRef,
+      shouldRetryDisconnect: () => true,
+      disconnectRetryPolicy: {
+        initialMs: 1,
+        maxMs: 1,
+        factor: 1,
+        jitter: 0,
+        maxAttempts: 2,
+      },
+    });
+    sock.ev.emit(
+      "messages.upsert",
+      buildNotifyMessageUpsert({
+        id: nextMessageId("timeout-retry"),
+        remoteJid: "999@s.whatsapp.net",
+        text: "ping",
+        timestamp: 1_700_000_000,
+        pushName: "Tester",
+      }),
+    );
+    await waitForMessageCalls(onMessage, 1);
+
+    const inbound = onMessage.mock.calls.at(0)?.at(0) as
+      | {
+          reply: (text: string) => Promise<void>;
+        }
+      | undefined;
+    expect(inbound).toBeDefined();
+
+    sock.sendMessage
+      .mockRejectedValueOnce(new Error("operation timed out"))
+      .mockResolvedValueOnce({ key: { id: "after-timeout" } });
+
+    await inbound?.reply("pong");
+
+    expect(sock.sendMessage).toHaveBeenNthCalledWith(1, "999@s.whatsapp.net", {
+      text: "pong",
+    });
+    expect(sock.sendMessage).toHaveBeenNthCalledWith(2, "999@s.whatsapp.net", {
+      text: "pong",
+    });
+    expect(socketRef.current).toBe(sock);
+    expect(sleepWithAbortMock).toHaveBeenCalledTimes(1);
+
+    await listener.close();
+  });
+
   it("deduplicates redelivered messages by id", async () => {
     const onMessage = vi.fn(async () => {
       return;
