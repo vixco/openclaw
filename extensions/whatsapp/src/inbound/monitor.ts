@@ -85,6 +85,10 @@ export async function monitorWebInbox(options: {
   const getCurrentSock = () => (options.socketRef ? options.socketRef.current : sock);
   const shouldRetryDisconnect = () => options.shouldRetryDisconnect?.() === true;
   const disconnectRetryPolicy = options.disconnectRetryPolicy ?? DEFAULT_RECONNECT_POLICY;
+  const sendRetryMaxAttempts =
+    disconnectRetryPolicy.maxAttempts > 0
+      ? disconnectRetryPolicy.maxAttempts
+      : DEFAULT_RECONNECT_POLICY.maxAttempts;
 
   let onCloseResolve: ((reason: WebListenerCloseReason) => void) | null = null;
   const onClose = new Promise<WebListenerCloseReason>((resolve) => {
@@ -214,7 +218,7 @@ export async function monitorWebInbox(options: {
         throw lastErr;
       }
 
-      if (disconnectRetryPolicy.maxAttempts > 0 && attempt >= disconnectRetryPolicy.maxAttempts) {
+      if (attempt >= sendRetryMaxAttempts) {
         throw lastErr;
       }
       const delayMs = computeBackoff(disconnectRetryPolicy, attempt);

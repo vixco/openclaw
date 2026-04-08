@@ -364,6 +364,50 @@ describe("web monitor inbox", () => {
     await listener.close();
   });
 
+  it("bounds reconnect-gap retries even when reconnect attempts are unlimited", async () => {
+    const onMessage = vi.fn(async () => undefined);
+    const socketRef: NonNullable<InboxMonitorOptions["socketRef"]> = { current: null };
+
+    const { listener } = await startInboxMonitor(onMessage as InboxOnMessage, {
+      socketRef,
+      shouldRetryDisconnect: () => true,
+      disconnectRetryPolicy: {
+        initialMs: 1,
+        maxMs: 1,
+        factor: 1,
+        jitter: 0,
+        maxAttempts: 0,
+      },
+    });
+    getSock().ev.emit(
+      "messages.upsert",
+      buildNotifyMessageUpsert({
+        id: nextMessageId("unlimited-reconnect-send-bound"),
+        remoteJid: "999@s.whatsapp.net",
+        text: "ping",
+        timestamp: 1_700_000_000,
+        pushName: "Tester",
+      }),
+    );
+    await waitForMessageCalls(onMessage, 1);
+
+    const inbound = onMessage.mock.calls.at(0)?.at(0) as
+      | {
+          reply: (text: string) => Promise<void>;
+        }
+      | undefined;
+    expect(inbound).toBeDefined();
+
+    socketRef.current = null;
+
+    await expect(inbound?.reply("pong")).rejects.toThrow(
+      "no active socket - reconnection in progress",
+    );
+    expect(sleepWithAbortMock).toHaveBeenCalledTimes(11);
+
+    await listener.close();
+  });
+
   it("deduplicates redelivered messages by id", async () => {
     const onMessage = vi.fn(async () => {
       return;
